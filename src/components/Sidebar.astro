@@ -98,7 +98,7 @@ const isActive = (href: string) => current === href.replace(/\/$/, '');
   };
 
   // Opened from the header hamburger (see Header.astro).
-  window.addEventListener('devsheets:toggle-sidebar', () => {
+  window.addEventListener('guias:toggle-sidebar', () => {
     const isOpen = !sidebar?.classList.contains('-translate-x-full');
     if (isOpen) {
       close();

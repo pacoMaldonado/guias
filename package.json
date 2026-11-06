@@ -1,5 +1,5 @@
 {
-  "name": "devsheets",
+  "name": "guias",
   "type": "module",
   "version": "0.1.0",
   "description": "Personal cheat sheets site built with Astro, Tailwind CSS and Content Collections.",

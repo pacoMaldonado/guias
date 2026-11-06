@@ -7,8 +7,8 @@
  */
 
 export const SITE = {
-  title: 'DevSheets',
-  tagline: 'Hojas de trucos personales',
+  title: 'Guías',
+  tagline: 'Hojas de trucos para desarrolladores',
   description:
     'Colección personal de hojas de trucos para terminal, frontend, backend, DevOps y más.',
 } as const;
