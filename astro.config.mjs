@@ -16,13 +16,9 @@ export default defineConfig({
   markdown: {
     // Wraps sections into panels and turns tables into tap-to-copy lists.
     rehypePlugins: [rehypeCheatsheet],
-    // Dual Shiki themes. The `.dark` CSS override in global.css switches
-    // between them based on the active color scheme.
+    // Dark terminal Shiki theme so code blocks always render as dark consoles.
     shikiConfig: {
-      themes: {
-        light: 'github-light',
-        dark: 'github-dark',
-      },
+      theme: 'github-dark',
       wrap: true,
     },
   },

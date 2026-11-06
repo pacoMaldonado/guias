@@ -1,14 +1,16 @@
 // @ts-nocheck
 /**
- * Rehype plugin that turns plain Markdown cheat sheets into a mobile-first
- * layout at build time (no client-side layout shift):
+ * Rehype plugin that transforms Markdown cheat sheets at build time:
  *
  *  - Every `## Heading` and the content after it is wrapped in a
- *    `<section class="sheet-section">` so it can be laid out as a panel.
+ *    `<section class="sheet-section">` card inside a 2-column `.sheet-grid`.
  *  - Tables are classified by their last header cell:
- *      "Comando"          -> `cmd-table`: each command becomes a tap-to-copy strip.
- *      "Atajo" (o ...)    -> `key-table`: shortcuts are rendered as keycaps.
- *      anything else      -> `def-table`: simple term / description rows.
+ *      "Comando"          -> `cmd-table`: dark terminal boxes with one-click copy.
+ *      "Atajo" (o ...)    -> `key-table`: hybrid! Ex/terminal commands become dark
+ *                            copyable terminal boxes, while shortcuts become `<kbd>` keycaps.
+ *      anything else      -> `def-table`: term / description rows.
+ *  - Every fenced `<pre>` code block is wrapped in a `.term-window` with a
+ *    macOS-style terminal header bar, language badge, and copy button.
  */
 
 const text = (node) =>
@@ -26,7 +28,7 @@ const isEl = (node, tag) => node.type === 'element' && node.tagName === tag;
 const svg = (paths, className) =>
   el(
     'svg',
-    { viewBox: '0 0 24 24', width: 18, height: 18, ariaHidden: 'true', className: [className] },
+    { viewBox: '0 0 24 24', width: 16, height: 16, ariaHidden: 'true', className: [className] },
     paths.map((d) => el('path', { d, fill: 'currentColor' })),
   );
 
@@ -40,19 +42,97 @@ function findAll(node, predicate, out = []) {
   return out;
 }
 
-/** Split a key combo like "Ctrl + u" or "<leader> f E" into keycaps. */
+/**
+ * Tokenize a command string for terminal syntax highlighting.
+ */
+function tokenizeCommand(displayCmd, isEx) {
+  const parts = displayCmd.split(/(\s+)/).filter(Boolean);
+  let seenFirstToken = false;
+
+  return parts.map((part) => {
+    if (/^\s+$/.test(part)) {
+      return { type: 'text', value: part };
+    }
+    let tokenClass = 'tok-arg';
+    if (!seenFirstToken) {
+      seenFirstToken = true;
+      tokenClass = isEx ? 'tok-ex' : 'tok-bin';
+    } else if (/^--?[a-zA-Z0-9]/.test(part)) {
+      tokenClass = 'tok-flag';
+    } else if (/^(\|\||&&|\||>|>>|2>&1)$/.test(part)) {
+      tokenClass = 'tok-op';
+    } else if (/^(<[^>]+>|\[[^\]]+\]|%)$/.test(part)) {
+      tokenClass = 'tok-var';
+    }
+    return el('span', { className: ['tok', tokenClass] }, [{ type: 'text', value: part }]);
+  });
+}
+
+/**
+ * Build a dark terminal command box with prompt, highlighted tokens and copy button.
+ */
+function buildCmdButton(rawCommand) {
+  const command = rawCommand.trim();
+  const isEx = command.startsWith(':');
+  const prompt = isEx ? ':' : '$';
+  const displayCmd = isEx ? command.slice(1).trimStart() : command;
+  const tokens = tokenizeCommand(displayCmd, isEx);
+
+  return el(
+    'button',
+    {
+      type: 'button',
+      className: ['cmd', isEx ? 'cmd-ex' : 'cmd-shell'],
+      dataCopy: command,
+      ariaLabel: `Copiar comando: ${command}`,
+    },
+    [
+      el('span', { className: ['cmd-prompt'], ariaHidden: 'true' }, [
+        { type: 'text', value: prompt },
+      ]),
+      el('code', { className: ['cmd-text'] }, tokens),
+      el('span', { className: ['cmd-state'], ariaHidden: 'true' }, [
+        svg([COPY_PATH], 'cmd-icon-copy'),
+        svg([CHECK_PATH], 'cmd-icon-done'),
+        el('span', { className: ['cmd-state-label'] }, [{ type: 'text', value: 'Copiar' }]),
+        el('span', { className: ['cmd-state-done'] }, [{ type: 'text', value: '¡Copiado!' }]),
+      ]),
+    ],
+  );
+}
+
+/** Split a key combo like "Ctrl + u" or "<leader> f E" into visual keycaps. */
 function toKeycaps(codeNode) {
   const value = text(codeNode).trim();
-  // Ex commands (":Lazy sync", ":!ls -la") stay as a single mono chip.
-  if (value.startsWith(':') || !/\s/.test(value)) {
-    return el('kbd', { className: ['key'] }, [{ type: 'text', value }]);
+  const isModifier = (tok) =>
+    /^(<leader>|Ctrl|Alt|Shift|Espacio|Tab|Esc)$/i.test(tok);
+
+  if (!/\s/.test(value)) {
+    return el(
+      'kbd',
+      { className: isModifier(value) ? ['key', 'key-mod'] : ['key'] },
+      [{ type: 'text', value }],
+    );
   }
   const parts = value.split(/\s+/).map((token) =>
     token === '+'
       ? el('span', { className: ['key-plus'] }, [{ type: 'text', value: '+' }])
-      : el('kbd', { className: ['key'] }, [{ type: 'text', value: token }]),
+      : el(
+          'kbd',
+          { className: isModifier(token) ? ['key', 'key-mod'] : ['key'] },
+          [{ type: 'text', value: token }],
+        ),
   );
   return el('span', { className: ['key-combo'] }, parts);
+}
+
+/**
+ * Determine whether a `<code>` node inside a shortcut/hybrid table is actually
+ * a copyable command (e.g., Neovim `:ExCommand` or shell command) rather than a key press.
+ */
+function isCopyableCommandCode(codeNode) {
+  const val = text(codeNode).trim();
+  return val.startsWith(':') && val.length > 1;
 }
 
 function transformTable(table) {
@@ -62,8 +142,6 @@ function transformTable(table) {
 
   table.properties = { ...table.properties, className: ['not-prose', 'sheet-table', `${kind}-table`] };
 
-  // Rows are laid out with display:block/flex, which drops native table
-  // semantics in some browsers, so restore them explicitly.
   table.properties.role = 'table';
   findAll(table, (n) => isEl(n, 'tr')).forEach((n) => (n.properties = { ...n.properties, role: 'row' }));
   findAll(table, (n) => isEl(n, 'th')).forEach((n) => (n.properties = { ...n.properties, role: 'columnheader' }));
@@ -76,9 +154,24 @@ function transformTable(table) {
     const cell = cells[cells.length - 1];
 
     if (kind === 'key') {
+      const codeNodes = findAll(cell, (n) => isEl(n, 'code'));
+      // Hybrid behavior: if the cell contains copyable commands (e.g. `:Lazy sync`, `:KiroToggle`),
+      // render it as a dark terminal command row with copy button!
+      if (codeNodes.length > 0 && codeNodes.every(isCopyableCommandCode)) {
+        row.properties.className = [...(row.properties.className ?? []), 'is-cmd-row'];
+        const buttons = codeNodes.map((c) => buildCmdButton(text(c)));
+        cell.children =
+          buttons.length === 1 ? buttons : [el('div', { className: ['cmd-list'] }, buttons)];
+        continue;
+      }
+
       const walk = (node) => {
         node.children = (node.children ?? []).map((child) =>
-          isEl(child, 'code') ? toKeycaps(child) : (walk(child), child),
+          isEl(child, 'code')
+            ? isCopyableCommandCode(child)
+              ? buildCmdButton(text(child))
+              : toKeycaps(child)
+            : (walk(child), child),
         );
       };
       walk(cell);
@@ -86,44 +179,105 @@ function transformTable(table) {
     }
 
     if (kind === 'cmd') {
-      const firstCode = findAll(cell, (n) => isEl(n, 'code'))[0];
-      const command = firstCode ? text(firstCode) : text(cell).trim();
-      // Keep every flag / argument unbreakable so lines only wrap at spaces.
-      const tokenize = (node) => {
-        node.children = (node.children ?? []).flatMap((child) => {
-          if (isEl(child, 'code')) {
-            const parts = text(child).split(/(\s+)/).filter(Boolean);
-            child.children = parts.map((part) =>
-              /^\s+$/.test(part)
-                ? { type: 'text', value: part }
-                : el('span', { className: ['tok'] }, [{ type: 'text', value: part }]),
-            );
-          }
-          return [child];
-        });
-      };
-      tokenize(cell);
-      const original = cell.children;
-      cell.children = [
-        el(
-          'button',
-          {
-            type: 'button',
-            className: ['cmd'],
-            dataCopy: command,
-            ariaLabel: `Copiar comando: ${command}`,
-          },
-          [
-            el('span', { className: ['cmd-text'] }, original),
-            el('span', { className: ['cmd-state'], ariaHidden: 'true' }, [
-              svg([COPY_PATH], 'cmd-icon-copy'),
-              svg([CHECK_PATH], 'cmd-icon-done'),
-            ]),
-          ],
-        ),
-      ];
+      const codeNodes = findAll(cell, (n) => isEl(n, 'code'));
+      if (codeNodes.length > 1) {
+        // Multiple alternative commands in one cell (e.g. `ng serve` o `ng s`):
+        // render each command as its own copyable terminal box.
+        cell.children = [
+          el(
+            'div',
+            { className: ['cmd-list'] },
+            codeNodes.map((c) => buildCmdButton(text(c))),
+          ),
+        ];
+      } else if (codeNodes.length === 1) {
+        cell.children = [buildCmdButton(text(codeNodes[0]))];
+      } else {
+        cell.children = [buildCmdButton(text(cell))];
+      }
     }
   }
+}
+
+/**
+ * Detect the language of a `<pre>` block from Shiki's `data-language` attribute
+ * or standard `language-*` classes.
+ */
+function detectLang(pre) {
+  const dataLang = pre.properties?.dataLanguage ?? pre.properties?.['data-language'];
+  if (typeof dataLang === 'string' && dataLang) return dataLang;
+
+  const code = findAll(pre, (n) => isEl(n, 'code'))[0];
+  const classes = [
+    ...(Array.isArray(pre.properties?.className) ? pre.properties.className : []),
+    ...(Array.isArray(code?.properties?.className) ? code.properties.className : []),
+  ];
+  for (const cls of classes) {
+    if (typeof cls === 'string' && cls.startsWith('language-')) {
+      return cls.slice('language-'.length);
+    }
+  }
+  return 'terminal';
+}
+
+const LANG_LABELS = {
+  bash: 'bash',
+  sh: 'sh',
+  zsh: 'zsh',
+  lua: 'lua · neovim',
+  json: 'json',
+  css: 'css',
+  ts: 'typescript',
+  js: 'javascript',
+  html: 'html',
+  text: 'output',
+  plaintext: 'output',
+};
+
+/**
+ * Wrap every `<pre>` element in a `.term-window` with a dark terminal header bar
+ * and an always-visible copy button.
+ */
+function wrapPreBlocks(node) {
+  if (!node.children) return;
+  node.children = node.children.map((child) => {
+    if (isEl(child, 'pre')) {
+      const rawCode = text(child).replace(/\n$/, '');
+      const lang = detectLang(child);
+      const label = LANG_LABELS[lang] ?? lang;
+
+      return el('div', { className: ['term-window', 'not-prose'] }, [
+        el('div', { className: ['term-header'] }, [
+          el('div', { className: ['term-title'] }, [
+            el('span', { className: ['term-dots'], ariaHidden: 'true' }, [
+              el('span', { className: ['term-dot', 'term-dot-red'] }),
+              el('span', { className: ['term-dot', 'term-dot-amber'] }),
+              el('span', { className: ['term-dot', 'term-dot-green'] }),
+            ]),
+            el('span', { className: ['term-lang'] }, [{ type: 'text', value: label }]),
+          ]),
+          el(
+            'button',
+            {
+              type: 'button',
+              className: ['copy-btn'],
+              dataCode: rawCode,
+              ariaLabel: 'Copiar código',
+            },
+            [
+              svg([COPY_PATH], 'cmd-icon-copy'),
+              svg([CHECK_PATH], 'cmd-icon-done'),
+              el('span', { className: ['cmd-state-label'] }, [{ type: 'text', value: 'Copiar' }]),
+              el('span', { className: ['cmd-state-done'] }, [{ type: 'text', value: '¡Copiado!' }]),
+            ],
+          ),
+        ]),
+        child,
+      ]);
+    }
+    wrapPreBlocks(child);
+    return child;
+  });
 }
 
 function wrapSections(root) {
@@ -149,6 +303,7 @@ function wrapSections(root) {
 export default function rehypeCheatsheet() {
   return (tree) => {
     findAll(tree, (n) => isEl(n, 'table')).forEach(transformTable);
+    wrapPreBlocks(tree);
     wrapSections(tree);
   };
 }

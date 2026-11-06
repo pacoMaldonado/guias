@@ -66,15 +66,90 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
     <script>
       const COPY_LABEL = 'Copiar';
 
-      // Enhance Markdown-rendered code blocks that lack an explicit button.
+      const buildCommandBoxHtml = (rawCmd: string) => {
+        const command = rawCmd.trim();
+        const isEx = command.startsWith(':');
+        const prompt = isEx ? ':' : '$';
+        const displayCmd = isEx ? command.slice(1).trimStart() : command;
+        let seenFirst = false;
+        const tokensHtml = displayCmd
+          .split(/(\s+)/)
+          .filter(Boolean)
+          .map((part) => {
+            if (/^\s+$/.test(part)) return part;
+            let cls = 'tok-arg';
+            if (!seenFirst) {
+              seenFirst = true;
+              cls = isEx ? 'tok-ex' : 'tok-bin';
+            } else if (/^--?[a-zA-Z0-9]/.test(part)) {
+              cls = 'tok-flag';
+            } else if (/^(\|\||&&|\||>|>>|2>&1)$/.test(part)) {
+              cls = 'tok-op';
+            } else if (/^(<[^>]+>|\[[^\]]+\]|%)$/.test(part)) {
+              cls = 'tok-var';
+            }
+            const escaped = part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<span class="tok ${cls}">${escaped}</span>`;
+          })
+          .join('');
+        const attrCmd = command.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<button type="button" class="cmd ${isEx ? 'cmd-ex' : 'cmd-shell'}" data-copy="${attrCmd}" aria-label="Copiar comando: ${attrCmd}"><span class="cmd-prompt" aria-hidden="true">${prompt}</span><code class="cmd-text">${tokensHtml}</code><span class="cmd-state" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="cmd-icon-copy"><path d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12z" fill="currentColor"></path></svg><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="cmd-icon-done"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z" fill="currentColor"></path></svg><span class="cmd-state-label">${COPY_LABEL}</span><span class="cmd-state-done">¡Copiado!</span></span></button>`;
+      };
+
+      // Upgrade any cached .cmd buttons (e.g. from astro dev in-memory store) to the full terminal box structure.
+      document.querySelectorAll('.cmd:not(:has(.cmd-prompt))').forEach((btn) => {
+        const codes = [...btn.querySelectorAll('code')].map((c) => c.textContent?.trim() ?? '').filter(Boolean);
+        const td = btn.parentElement;
+        if (!td) return;
+        if (codes.length > 1) {
+          td.innerHTML = `<div class="cmd-list">${codes.map(buildCommandBoxHtml).join('')}</div>`;
+        } else {
+          const single = codes[0] || btn.getAttribute('data-copy') || btn.textContent?.trim() || '';
+          btn.outerHTML = buildCommandBoxHtml(single);
+        }
+      });
+
+      // Upgrade any cached Ex commands rendered as <kbd class="key">:...</kbd> in hybrid tables.
+      document.querySelectorAll('.key-table tr:not(.is-cmd-row)').forEach((row) => {
+        const lastTd = row.querySelector('td:last-child');
+        if (!lastTd) return;
+        const keys = [...lastTd.querySelectorAll('kbd.key')];
+        if (keys.length > 0 && keys.every((k) => (k.textContent?.trim() ?? '').startsWith(':'))) {
+          row.classList.add('is-cmd-row');
+          const cmds = keys.map((k) => k.textContent?.trim() ?? '');
+          lastTd.innerHTML = cmds.length > 1 ? `<div class="cmd-list">${cmds.map(buildCommandBoxHtml).join('')}</div>` : buildCommandBoxHtml(cmds[0]);
+        }
+      });
+
+      // Fallback for any standalone <pre> not already wrapped in a .term-window or figure:
+      // wrap it in a .term-window header so the copy button always sits at the top-right.
       document.querySelectorAll('.prose pre').forEach((pre) => {
-        if (pre.querySelector('.copy-btn')) return;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'copy-btn';
-        button.setAttribute('aria-label', 'Copiar código');
-        button.textContent = COPY_LABEL;
-        pre.appendChild(button);
+        if (pre.closest('.term-window') || pre.closest('figure')) return;
+        pre.querySelector('.copy-btn')?.remove();
+
+        const lang = pre.getAttribute('data-language') || 'terminal';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'term-window not-prose';
+        wrapper.innerHTML = `
+          <div class="term-header">
+            <div class="term-title">
+              <span class="term-dots" aria-hidden="true">
+                <span class="term-dot term-dot-red"></span>
+                <span class="term-dot term-dot-amber"></span>
+                <span class="term-dot term-dot-green"></span>
+              </span>
+              <span class="term-lang">${lang}</span>
+            </div>
+            <button type="button" class="copy-btn" aria-label="Copiar código">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="cmd-icon-copy"><path d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12z" fill="currentColor"></path></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="cmd-icon-done"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59z" fill="currentColor"></path></svg>
+              <span class="cmd-state-label">${COPY_LABEL}</span>
+              <span class="cmd-state-done">¡Copiado!</span>
+            </button>
+          </div>
+        `;
+        pre.parentNode?.insertBefore(wrapper, pre);
+        wrapper.appendChild(pre);
       });
 
       const toast = document.getElementById('toast');
@@ -128,7 +203,10 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
         let text = cmd
           ? button.getAttribute('data-copy')
           : button.getAttribute('data-code');
-        if (!text) text = button.closest('pre')?.querySelector('code')?.textContent ?? '';
+        if (!text) {
+          text =
+            button.closest('.term-window, figure, pre')?.querySelector('code')?.textContent ?? '';
+        }
 
         if (await writeClipboard(text)) {
           flash(button);
