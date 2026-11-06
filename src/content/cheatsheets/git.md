@@ -8,49 +8,41 @@ lastUpdated: 2026-10-28
 isDraft: false
 ---
 
-Comandos de Git que usas cada día, agrupados por tarea.
+Comandos de Git que usas cada día, agrupados por tarea. Usa `git switch` y `git restore` en lugar de `git checkout`: son más explícitos y reducen los errores.
 
 ## Configuración inicial
 
-```bash
-git config --global user.name "Tu Nombre"
-git config --global user.email "tu@correo.com"
-git config --global init.defaultBranch main
-```
+| Acción | Comando |
+| --- | --- |
+| Definir tu nombre global | `git config --global user.name "Tu Nombre"` |
+| Definir tu correo global | `git config --global user.email "tu@correo.com"` |
+| Establecer `main` como rama por defecto | `git config --global init.defaultBranch main` |
+| Ver toda la configuración activa | `git config --list` |
 
 ## Ramas
 
-```bash
-# List all branches (local and remote)
-git branch -a
-
-# Create and switch to a new branch
-git switch -c feature/login
-
-# Delete a merged branch
-git branch -d feature/login
-```
+| Acción | Comando |
+| --- | --- |
+| Listar todas las ramas (locales y remotas) | `git branch -a` |
+| Crear y cambiar a una rama nueva | `git switch -c feature/login` |
+| Cambiar a una rama existente | `git switch main` |
+| Eliminar una rama ya fusionada | `git branch -d feature/login` |
+| Forzar el borrado de una rama | `git branch -D feature/login` |
 
 ## Deshacer cambios
 
-```bash
-# Discard changes in a file (careful: irreversible)
-git restore path/to/file.ts
-
-# Unstage a file but keep the changes
-git restore --staged path/to/file.ts
-
-# Amend the last commit message
-git commit --amend -m "feat: add login form validation"
-```
+| Acción | Comando |
+| --- | --- |
+| Descartar cambios locales en un archivo | `git restore path/to/file.ts` |
+| Quitar un archivo del área de staging | `git restore --staged path/to/file.ts` |
+| Corregir el mensaje del último commit | `git commit --amend -m "feat: add login form validation"` |
+| Deshacer el último commit conservando los cambios | `git reset --soft HEAD~1` |
 
 ## Trabajo remoto
 
-```bash
-git remote add origin git@github.com:user/repo.git
-git push -u origin main
-git pull --rebase origin main
-```
-
-> **Consejo:** usa `git switch` y `git restore` en lugar de `git checkout`.
-> Son más explícitos y reducen los errores.
+| Acción | Comando |
+| --- | --- |
+| Vincular el repositorio remoto `origin` | `git remote add origin git@github.com:user/repo.git` |
+| Subir la rama actual y configurar el tracking | `git push -u origin main` |
+| Traer cambios aplicando rebase limpio | `git pull --rebase origin main` |
+| Descargar referencias remotas sin fusionar | `git fetch --all --prune` |
