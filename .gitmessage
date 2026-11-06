@@ -1,0 +1,60 @@
+# feat(alcance): descripción breve (máximo 50 caracteres)
+#
+# Explicación detallada del cambio:
+# - Qué cambió y por qué
+# - Impacto en el usuario/sistema
+# - Consideraciones técnicas importantes
+#
+# Closes #
+
+# ═══════════════════════════════════════════════════════════════════
+# 📋 GUÍA RÁPIDA DE TIPOS
+# ═══════════════════════════════════════════════════════════════════
+#
+# feat     → Nueva funcionalidad
+# fix      → Corrección de bugs  
+# docs     → Documentación
+# style    → Formato de código (espacios, comas, etc.)
+# refactor → Refactorización (sin cambios de funcionalidad)
+# test     → Agregar o modificar tests
+# chore    → Mantenimiento (dependencias, configuración)
+# perf     → Optimización de rendimiento
+# hotfix   → Corrección crítica en producción
+# wip      → Trabajo en progreso (temporal)
+#
+# ═══════════════════════════════════════════════════════════════════
+# 🏷️ ALCANCES COMUNES
+# ═══════════════════════════════════════════════════════════════════
+#
+# auth     → Autenticación/autorización
+# ui       → Interfaz de usuario
+# api      → Backend/endpoints
+# db       → Base de datos
+# config   → Configuración
+# deps     → Dependencias
+# test     → Pruebas
+# docs     → Documentación
+#
+# ═══════════════════════════════════════════════════════════════════
+# ✅ EJEMPLOS VÁLIDOS
+# ═══════════════════════════════════════════════════════════════════
+#
+# feat(auth): add JWT token validation
+# fix(ui): resolve modal overlay issue  
+# docs(api): update endpoint documentation
+# refactor(db): optimize user queries
+# test(auth): add login integration tests
+# chore(deps): update react to v18.2.0
+#
+# ═══════════════════════════════════════════════════════════════════
+# 📝 RECORDATORIOS
+# ═══════════════════════════════════════════════════════════════════
+#
+# • Usar imperativo: "add" no "added" o "adds"
+# • Primera letra minúscula después del tipo
+# • Sin punto final en el título
+# • Línea en blanco entre título y cuerpo
+# • Máximo 72 caracteres por línea en el cuerpo
+# • En inglés para consistencia profesional
+#
+# ═══════════════════════════════════════════════════════════════════

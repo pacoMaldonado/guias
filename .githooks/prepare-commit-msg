@@ -1,0 +1,17 @@
+#!/bin/bash
+# .githooks/prepare-commit-msg
+# Inserta automáticamente el nombre de la rama al inicio del mensaje
+
+ARCHIVO_MSG="$1"
+TIPO_COMMIT="$2"
+
+# Solo actúa en commits normales (no merges, squash, etc.)
+if [ "$TIPO_COMMIT" = "" ] || [ "$TIPO_COMMIT" = "message" ]; then
+  RAMA=$(git symbolic-ref --short HEAD 2>/dev/null)
+  MENSAJE_ACTUAL=$(cat "$ARCHIVO_MSG")
+
+  # Solo inserta si el mensaje no tiene ya el nombre de rama
+  if ! echo "$MENSAJE_ACTUAL" | grep -q "\[$RAMA\]"; then
+    echo "[$RAMA] $MENSAJE_ACTUAL" > "$ARCHIVO_MSG"
+  fi
+fi
