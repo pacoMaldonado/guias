@@ -1,0 +1,102 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import { SITE } from '../consts';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title, description = SITE.description } = Astro.props;
+const pageTitle = title ? `${title} · ${SITE.title}` : `${SITE.title} · ${SITE.tagline}`;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin);
+---
+
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical.toString()} />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+
+    {/* Apply the saved theme before paint to avoid a flash of the wrong theme. */}
+    <script is:inline>
+      const stored = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'dark' || (!stored && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+  </head>
+
+  <body class="min-h-screen">
+    <Header />
+
+    <div class="mx-auto flex w-full max-w-screen-2xl">
+      <Sidebar />
+      <main class="min-w-0 flex-1 px-4 py-8 lg:px-8">
+        <slot />
+      </main>
+    </div>
+
+    {/* Clipboard support for every code block on the page. */}
+    <script>
+      const COPY_LABEL = 'Copiar';
+      const DONE_LABEL = '¡Copiado!';
+
+      // Enhance Markdown-rendered code blocks that lack an explicit button.
+      document.querySelectorAll('.prose pre').forEach((pre) => {
+        if (pre.querySelector('.copy-btn')) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'copy-btn';
+        button.setAttribute('aria-label', 'Copiar código');
+        button.textContent = COPY_LABEL;
+        pre.appendChild(button);
+      });
+
+      const flash = (button: Element) => {
+        const label = button.querySelector('span') ?? button;
+        const original = label.textContent;
+        label.textContent = DONE_LABEL;
+        button.classList.add('is-copied');
+        window.setTimeout(() => {
+          label.textContent = original || COPY_LABEL;
+          button.classList.remove('is-copied');
+        }, 1800);
+      };
+
+      // Event delegation covers both auto-enhanced and explicit CodeBlock buttons.
+      document.addEventListener('click', async (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest('.copy-btn');
+        if (!button) return;
+
+        let text = button.getAttribute('data-code');
+        if (!text) {
+          const code = button.closest('pre')?.querySelector('code');
+          text = code?.textContent ?? '';
+        }
+
+        try {
+          await navigator.clipboard.writeText(text);
+          flash(button);
+        } catch {
+          /* Clipboard access can be blocked; fail silently. */
+        }
+      });
+    </script>
+  </body>
+</html>

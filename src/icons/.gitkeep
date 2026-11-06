@@ -1,0 +1,3 @@
+# Drop custom local SVG icons here to use them as <Icon name="my-icon" />.
+# Built-in Material Design Icons (mdi:*) come from @iconify-json/mdi and do not
+# need a file here.

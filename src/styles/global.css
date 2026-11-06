@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@plugin '@tailwindcss/typography';
+
+/* Enable class-based dark mode (toggled on <html class="dark">). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+
+  /* Brand palette */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply dark:bg-slate-950 dark:text-slate-200;
+    font-family: var(--font-sans);
+  }
+
+  /* Visible focus ring for keyboard users. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}
+
+/*
+ * Dual Shiki theme support. Shiki renders with the light theme by default and
+ * exposes the dark colors as CSS variables; this override swaps them in when
+ * the document is in dark mode.
+ */
+@layer components {
+  html.dark .astro-code,
+  html.dark .astro-code span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+
+  /* Code block + copy button chrome.
+     These classes are added at runtime, so they are authored as plain CSS. */
+  .prose pre {
+    @apply relative;
+  }
+
+  .copy-btn {
+    @apply absolute right-2 top-2 z-10 inline-flex items-center gap-1
+      rounded-md border border-white/15 bg-slate-700/70 px-2 py-1
+      text-xs font-medium text-slate-100 opacity-0 backdrop-blur
+      transition hover:bg-slate-600/80 focus:opacity-100;
+    cursor: pointer;
+  }
+
+  .prose pre:hover .copy-btn,
+  .copy-btn:focus-visible {
+    @apply opacity-100;
+  }
+
+  .copy-btn.is-copied {
+    @apply border-emerald-400/40 bg-emerald-600/80 text-white opacity-100;
+  }
+}

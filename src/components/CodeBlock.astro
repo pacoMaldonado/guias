@@ -1,0 +1,46 @@
+---
+import { Code } from 'astro:components';
+import { Icon } from 'astro-icon/components';
+
+/**
+ * Reusable syntax-highlighted code block with a "copy to clipboard" button.
+ *
+ * Markdown fenced code blocks are enhanced automatically by BaseLayout, so
+ * this component is only needed for explicit use inside `.mdx` content, e.g.:
+ *
+ *   <CodeBlock lang="bash" code={`npm install\nnpm run dev`} title="Setup" />
+ */
+interface Props {
+  code: string;
+  /** A Shiki language identifier, e.g. "bash", "ts", "css". */
+  lang?: string;
+  title?: string;
+}
+
+const { code, lang = 'bash', title } = Astro.props;
+---
+
+<figure
+  class="group relative my-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
+>
+  {
+    title && (
+      <figcaption class="flex items-center gap-2 border-b border-slate-200 bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+        <Icon name="mdi:code-tags" class="h-4 w-4" />
+        {title}
+      </figcaption>
+    )
+  }
+
+  <button
+    type="button"
+    class="copy-btn"
+    data-code={code}
+    aria-label="Copiar código"
+  >
+    <Icon name="mdi:content-copy" class="h-3.5 w-3.5" />
+    <span>Copiar</span>
+  </button>
+
+  <Code code={code} lang={lang as any} />
+</figure>

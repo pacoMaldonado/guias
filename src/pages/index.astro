@@ -1,0 +1,84 @@
+---
+import { Icon } from 'astro-icon/components';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCheatSheetsByCategory, getPublishedCheatSheets, sheetUrl } from '../lib/content';
+import { SITE } from '../consts';
+
+const groups = await getCheatSheetsByCategory();
+const total = (await getPublishedCheatSheets()).length;
+---
+
+<BaseLayout>
+  <!-- Hero -->
+  <section class="mx-auto mb-12 max-w-4xl text-center">
+    <span
+      class="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400"
+    >
+      <Icon name="mdi:lightning-bolt" class="h-4 w-4" />
+      {total} {total === 1 ? 'hoja disponible' : 'hojas disponibles'}
+    </span>
+    <h1 class="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+      {SITE.title}
+    </h1>
+    <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
+      {SITE.description} Encuentra comandos y recetas al instante con el buscador.
+    </p>
+  </section>
+
+  {
+    groups.length === 0 ? (
+      <p class="text-center text-slate-500 dark:text-slate-400">
+        Todavía no hay hojas de trucos. Crea tu primer archivo en
+        <code class="rounded bg-slate-100 px-1 dark:bg-slate-800">src/content/cheatsheets/</code>.
+      </p>
+    ) : (
+      <div class="space-y-12">
+        {groups.map((group) => (
+          <section aria-labelledby={`cat-${group.id}`}>
+            <h2
+              id={`cat-${group.id}`}
+              class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white"
+            >
+              <Icon name={group.icon} class="h-6 w-6 text-brand-600 dark:text-brand-400" />
+              {group.label}
+            </h2>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {group.sheets.map((sheet) => (
+                <a
+                  href={sheetUrl(sheet)}
+                  class="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-500/40"
+                >
+                  <div class="mb-3 flex items-start justify-between">
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                      <Icon name={sheet.data.icon} class="h-5 w-5" />
+                    </span>
+                    <Icon
+                      name="mdi:arrow-top-right"
+                      class="h-5 w-5 text-slate-300 transition group-hover:text-brand-500 dark:text-slate-600"
+                    />
+                  </div>
+                  <h3 class="font-semibold text-slate-900 dark:text-white">
+                    {sheet.data.title}
+                  </h3>
+                  <p class="mt-1 line-clamp-2 flex-1 text-sm text-slate-500 dark:text-slate-400">
+                    {sheet.data.description}
+                  </p>
+                  {sheet.data.tags.length > 0 && (
+                    <ul class="mt-3 flex flex-wrap gap-1.5">
+                      {sheet.data.tags.slice(0, 4).map((tag) => (
+                        <li class="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          #{tag}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </a>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    )
+  }
+</BaseLayout>
