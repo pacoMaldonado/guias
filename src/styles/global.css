@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/jetbrains-mono';
 @plugin '@tailwindcss/typography';
 
 /* Enable class-based dark mode (toggled on <html class="dark">). */
@@ -10,9 +12,14 @@
     'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
     Roboto, Helvetica, Arial, sans-serif;
 
+  --font-display: 'Bricolage Grotesque Variable', 'Inter Variable', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
   /* Brand palette */
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
   --color-brand-400: #818cf8;
   --color-brand-500: #6366f1;
   --color-brand-600: #4f46e5;
@@ -73,5 +80,50 @@
 
   .copy-btn.is-copied {
     @apply border-emerald-400/40 bg-emerald-600/80 text-white opacity-100;
+  }
+}
+
+/*
+ * Cheat sheet body: on wide screens sections flow into columns so the page
+ * uses the full width instead of a narrow centered strip.
+ */
+@layer components {
+  .sheet-body {
+    font-size: 0.95rem;
+  }
+
+  .sheet-body pre,
+  .sheet-body code {
+    font-family: var(--font-mono);
+  }
+
+  .sheet-body pre {
+    border-radius: 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .sheet-body h2 {
+    @apply font-display;
+    break-after: avoid;
+  }
+
+  @media (min-width: 1280px) {
+    .sheet-body {
+      column-count: 2;
+      column-gap: 3rem;
+    }
+    .sheet-body > * {
+      break-inside: avoid-column;
+    }
+    .sheet-body > h2,
+    .sheet-body > h3 {
+      break-after: avoid-column;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .sheet-body {
+      column-count: 3;
+    }
   }
 }
