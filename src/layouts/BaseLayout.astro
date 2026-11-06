@@ -55,15 +55,16 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
 
     <div class="flex w-full">
       <Sidebar />
-      <main class="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12 lg:py-10 xl:px-16">
+      <main class="page-main min-w-0 flex-1 py-6 sm:py-8 lg:py-10">
         <slot />
       </main>
     </div>
 
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
     {/* Clipboard support for every code block on the page. */}
     <script>
       const COPY_LABEL = 'Copiar';
-      const DONE_LABEL = '¡Copiado!';
 
       // Enhance Markdown-rendered code blocks that lack an explicit button.
       document.querySelectorAll('.prose pre').forEach((pre) => {
@@ -76,37 +77,97 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
         pre.appendChild(button);
       });
 
-      const flash = (button: Element) => {
-        const label = button.querySelector('span') ?? button;
-        const original = label.textContent;
-        label.textContent = DONE_LABEL;
-        button.classList.add('is-copied');
-        window.setTimeout(() => {
-          label.textContent = original || COPY_LABEL;
-          button.classList.remove('is-copied');
-        }, 1800);
+      const toast = document.getElementById('toast');
+      let toastTimer: number | undefined;
+      const showToast = (message: string) => {
+        if (!toast) return;
+        toast.textContent = message;
+        toast.classList.add('is-visible');
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 1600);
       };
 
-      // Event delegation covers both auto-enhanced and explicit CodeBlock buttons.
+      // Clipboard API needs HTTPS/localhost; fall back for plain-HTTP LAN testing on phones.
+      const writeClipboard = async (text: string) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', '');
+          area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+          document.body.appendChild(area);
+          area.select();
+          let ok = false;
+          try {
+            // eslint-disable-next-line deprecation/deprecation
+          ok = document.execCommand('copy');
+          } catch {
+            ok = false;
+          }
+          area.remove();
+          return ok;
+        }
+      };
+
+      const flash = (button: Element) => {
+        button.classList.add('is-copied');
+        window.setTimeout(() => button.classList.remove('is-copied'), 1600);
+      };
+
+      // Event delegation covers command strips, auto-enhanced and explicit code blocks.
       document.addEventListener('click', async (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
-        const button = target.closest('.copy-btn');
+
+        const cmd = target.closest('.cmd');
+        const button = cmd ?? target.closest('.copy-btn');
         if (!button) return;
 
-        let text = button.getAttribute('data-code');
-        if (!text) {
-          const code = button.closest('pre')?.querySelector('code');
-          text = code?.textContent ?? '';
-        }
+        let text = cmd
+          ? button.getAttribute('data-copy')
+          : button.getAttribute('data-code');
+        if (!text) text = button.closest('pre')?.querySelector('code')?.textContent ?? '';
 
-        try {
-          await navigator.clipboard.writeText(text);
+        if (await writeClipboard(text)) {
           flash(button);
-        } catch {
-          /* Clipboard access can be blocked; fail silently. */
+          showToast('Copiado al portapapeles');
+        } else {
+          showToast('No se pudo copiar');
         }
       });
+
+      // Expose the sticky header height so sticky/anchored elements can offset it.
+      const header = document.querySelector('header');
+      if (header) {
+        const setHeaderHeight = () =>
+          document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`);
+        setHeaderHeight();
+        new ResizeObserver(setHeaderHeight).observe(header);
+      }
+
+      // Highlight the section being read in the sticky section bar.
+      const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.sheet-toc a');
+      if (tocLinks.length) {
+        const byId = new Map(
+          [...tocLinks].map((a) => [decodeURIComponent(a.hash.slice(1)), a] as const),
+        );
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              const id = entry.target.querySelector('h2')?.id ?? '';
+              tocLinks.forEach((a) => a.removeAttribute('aria-current'));
+              const link = byId.get(id);
+              link?.setAttribute('aria-current', 'true');
+              link?.scrollIntoView({ block: 'nearest', inline: 'center' });
+            }
+          },
+          { rootMargin: '-25% 0px -65% 0px' },
+        );
+        document.querySelectorAll('.sheet-section').forEach((section) => observer.observe(section));
+      }
     </script>
   </body>
 </html>

@@ -13,9 +13,9 @@ export const getStaticPaths = (async () => {
 }) satisfies GetStaticPaths;
 
 const { sheet } = Astro.props;
-const { Content } = await sheet.render();
+const { Content, headings } = await sheet.render();
 ---
 
-<CheatSheetLayout sheet={sheet}>
+<CheatSheetLayout sheet={sheet} headings={headings}>
   <Content />
 </CheatSheetLayout>

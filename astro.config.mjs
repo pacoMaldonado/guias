@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import icon from 'astro-icon';
 import tailwindcss from '@tailwindcss/vite';
+import rehypeCheatsheet from './src/lib/rehype-cheatsheet.mjs';
 
 // Static Site Generation only. DevOps deploys the `dist/` output to an
 // AWS S3 bucket served through AWS CloudFront, so no server runtime is used.
@@ -13,6 +14,8 @@ export default defineConfig({
   trailingSlash: 'ignore',
   integrations: [mdx(), icon()],
   markdown: {
+    // Wraps sections into panels and turns tables into tap-to-copy lists.
+    rehypePlugins: [rehypeCheatsheet],
     // Dual Shiki themes. The `.dark` CSS override in global.css switches
     // between them based on the active color scheme.
     shikiConfig: {
