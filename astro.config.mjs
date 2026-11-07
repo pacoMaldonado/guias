@@ -10,7 +10,7 @@ import rehypeCheatsheet from './src/lib/rehype-cheatsheet.mjs';
 // https://astro.build/config
 export default defineConfig({
   output: 'static',
-  site: 'https://cheatsheets.example.com',
+  site: 'https://guias.maldolabs.com',
   trailingSlash: 'ignore',
   integrations: [mdx(), icon()],
   markdown: {
