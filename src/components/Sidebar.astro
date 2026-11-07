@@ -52,6 +52,12 @@ const isActive = (href: string) => current === href.replace(/\/$/, '');
           <h3 class="flex items-center gap-2 px-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
             <Icon name={group.icon} class="h-4 w-4 text-brand-600 dark:text-brand-400" />
             {group.label}
+            <span
+              class="ml-auto rounded-full bg-slate-200/70 px-2 py-0.5 text-[0.6875rem] font-medium text-slate-500 tabular-nums dark:bg-slate-800 dark:text-slate-400"
+              aria-label={`${group.sheets.length} ${group.sheets.length === 1 ? 'hoja' : 'hojas'}`}
+            >
+              {group.sheets.length}
+            </span>
           </h3>
           <ul class="mt-2 space-y-0.5">
             {group.sheets.map((sheet) => {

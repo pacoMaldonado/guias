@@ -11,6 +11,7 @@ export const SITE = {
   tagline: 'Hojas de trucos para desarrolladores',
   description:
     'Colección personal de hojas de trucos para terminal, frontend, backend, DevOps y más.',
+  repoUrl: 'https://github.com/pacoMaldonado/guias',
 } as const;
 
 export type CategoryId =
