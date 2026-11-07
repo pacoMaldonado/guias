@@ -44,6 +44,9 @@ function findAll(node, predicate, out = []) {
   return out;
 }
 
+/** Tokens longer than this may wrap inside the command box instead of overflowing it. */
+const LONG_TOKEN = 28;
+
 /**
  * Tokenize a command string for terminal syntax highlighting.
  */
@@ -66,7 +69,9 @@ function tokenizeCommand(displayCmd, isEx) {
     } else if (/^(<[^>]+>|\[[^\]]+\]|%)$/.test(part)) {
       tokenClass = 'tok-var';
     }
-    return el('span', { className: ['tok', tokenClass] }, [{ type: 'text', value: part }]);
+    // Very long tokens (e.g. PowerShell .NET calls) may wrap; short ones never break mid-flag.
+    const classes = part.length > LONG_TOKEN ? ['tok', tokenClass, 'tok-long'] : ['tok', tokenClass];
+    return el('span', { className: classes }, [{ type: 'text', value: part }]);
   });
 }
 
@@ -305,14 +310,20 @@ function wrapPreBlocks(node) {
 const INFO_PATH =
   'M11 9h2V7h-2m1 13c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-1 15h2v-6h-2z';
 const MODIFIER_KEY = /^(<leader>|Ctrl|Alt|Shift|Espacio|Tab|Esc|Enter|Cmd|Option)$/i;
+const KEY_COMBO = /^(Ctrl|Alt|Shift|Cmd|Option)( \+ [^\s+]{1,6})+$/i;
 
 /** Intro text before the first `##` becomes a "tip" callout; modifier keys render as keycaps. */
 function buildIntro(nodes) {
   if (!nodes.some((n) => n.type === 'element')) return nodes;
   const walk = (node) => {
     node.children = (node.children ?? []).map((child) => {
-      if (isEl(child, 'code') && MODIFIER_KEY.test(text(child).trim())) {
-        return el('kbd', { className: ['key', 'key-mod'] }, [{ type: 'text', value: text(child).trim() }]);
+      const value = isEl(child, 'code') ? text(child).trim() : '';
+      if (value && MODIFIER_KEY.test(value)) {
+        return el('kbd', { className: ['key', 'key-mod'] }, [{ type: 'text', value }]);
+      }
+      // Key combos such as "Shift + Tab" or "Ctrl + Shift + P".
+      if (value && KEY_COMBO.test(value)) {
+        return toKeycaps(child);
       }
       walk(child);
       return child;

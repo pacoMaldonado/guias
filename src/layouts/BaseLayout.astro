@@ -96,7 +96,8 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
               cls = 'tok-var';
             }
             const escaped = part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `<span class="tok ${cls}">${escaped}</span>`;
+            const long = part.length > 28 ? ' tok-long' : '';
+            return `<span class="tok ${cls}${long}">${escaped}</span>`;
           })
           .join('');
         const attrCmd = command.replace(/&/g, '&amp;').replace(/"/g, '&quot;');

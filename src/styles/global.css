@@ -38,6 +38,15 @@
     font-family: var(--font-sans);
   }
 
+  /* Show code exactly as typed: no ligatures turning "-->" or "==>" into arrows. */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-variant-ligatures: none;
+    font-feature-settings: 'liga' 0, 'calt' 0;
+  }
+
   /* Visible focus ring for keyboard users. */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-500;
@@ -607,6 +616,7 @@ html.dark .sheet-table td:first-child { color: var(--color-slate-300); }
 
 /* Terminal syntax token colors inside .cmd-text */
 .cmd-text .tok { white-space: nowrap; }
+.cmd-text .tok-long { white-space: normal; overflow-wrap: anywhere; }
 .cmd-text .tok-bin { color: #7dd3fc; font-weight: 600; }
 .cmd-text .tok-ex { color: #c4b5fd; font-weight: 600; }
 .cmd-text .tok-flag { color: #fbbf24; }
