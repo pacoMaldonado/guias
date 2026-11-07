@@ -1,0 +1,109 @@
+# =============================================================================
+# Deploy pipeline — build the Astro site once and publish it to S3 + CloudFront
+#
+#   push → main        : build, then deploy dev → qa → prod
+#   workflow_dispatch  : build, then deploy a single environment
+#
+# Authentication: GitHub OIDC → role-maldolabs-guias-<env>-site-deploy
+# (created by the infra-web-guias repository). No AWS keys are stored.
+#
+# Repository variable:
+#   AWS_REGION                  = us-east-1
+# GitHub environment variables (dev, qa, prod — values from `terraform output`):
+#   AWS_ROLE_ARN                = site_deploy_role_arn
+#   S3_BUCKET                   = site_bucket_name
+#   CLOUDFRONT_DISTRIBUTION_ID  = cloudfront_distribution_id
+# =============================================================================
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        type: choice
+        options: [dev, qa, prod]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build once; every environment receives the exact same artifact.
+  # ---------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Same pnpm major as local development (package.json has no packageManager field).
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Deploy jobs (one per environment, gated by GitHub environments)
+  # ---------------------------------------------------------------------------
+  deploy-dev:
+    needs: build
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: dev
+    permissions:
+      contents: read
+      id-token: write
+
+  deploy-qa:
+    needs: [build, deploy-dev]
+    if: >-
+      always() && needs.build.result == 'success' && (
+        (github.event_name == 'push' && needs.deploy-dev.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa')
+      )
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: qa
+    permissions:
+      contents: read
+      id-token: write
+
+  deploy-prod:
+    needs: [build, deploy-qa]
+    if: >-
+      always() && needs.build.result == 'success' && (
+        (github.event_name == 'push' && needs.deploy-qa.result == 'success') ||
+        (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
+      )
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: prod
+    permissions:
+      contents: read
+      id-token: write
