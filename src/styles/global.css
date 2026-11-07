@@ -123,8 +123,8 @@
   color: var(--color-brand-600);
 }
 html.dark .sheet-row {
-  border-color: var(--color-slate-800);
-  background: var(--color-slate-900);
+  border-color: rgb(51 65 85 / 0.7);
+  background: color-mix(in srgb, var(--color-slate-900) 85%, var(--color-slate-800));
   box-shadow: none;
 }
 html.dark .sheet-row:hover {
@@ -151,16 +151,70 @@ html.dark .sheet-row-icon {
   border-bottom: 1px solid var(--color-slate-200);
   backdrop-filter: blur(12px);
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 .sheet-toc ul {
+  --fade-l: 2.5rem;
+  --fade-r: 2.5rem;
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 0.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
   overflow-x: auto;
+  scroll-behavior: smooth;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  /* Fade the edges so it is obvious the bar scrolls sideways. */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)),
+    transparent 100%
+  );
+}
+.sheet-toc[data-at-start] ul { --fade-l: 0px; }
+.sheet-toc[data-at-end] ul { --fade-r: 0px; }
+
+.sheet-toc-arrow {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-slate-600);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.sheet-toc-arrow:hover {
+  border-color: var(--color-brand-400);
+  color: var(--color-brand-600);
+}
+@media (min-width: 640px) and (hover: hover) {
+  .sheet-toc-arrow { display: inline-flex; }
+}
+.sheet-toc[data-at-start] .sheet-toc-arrow[data-dir='-1'],
+.sheet-toc[data-at-end] .sheet-toc-arrow[data-dir='1'] {
+  opacity: 0;
+  pointer-events: none;
+}
+html.dark .sheet-toc-arrow {
+  border-color: var(--color-slate-700);
+  background: var(--color-slate-900);
+  color: var(--color-slate-300);
+}
+html.dark .sheet-toc-arrow:hover {
+  border-color: var(--color-brand-400);
+  color: var(--color-white);
 }
 .sheet-toc ul::-webkit-scrollbar { display: none; }
 .sheet-toc li { flex-shrink: 0; }
@@ -238,7 +292,109 @@ html.dark .sheet-body :not(pre):not(.cmd):not(.cmd-text) > code:not(.cmd-text) {
   background: transparent !important;
   box-shadow: none !important;
 }
-.sheet-body > p:first-child { max-width: 52rem; }
+/* Intro "tip" callout (built by rehype-cheatsheet from the text before the first ##). */
+.sheet-intro {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 60rem;
+  margin-bottom: 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--color-brand-200);
+  border-left-width: 4px;
+  border-radius: 0.75rem;
+  background: var(--color-brand-50);
+  color: var(--color-slate-700);
+  font-size: 0.925rem;
+  line-height: 1.65;
+}
+.sheet-intro-icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--color-brand-600);
+}
+.sheet-intro-svg { width: 1.15rem; height: 1.15rem; }
+.sheet-intro-body > * { margin: 0; }
+.sheet-intro-body > * + * { margin-top: 0.4rem; }
+.sheet-intro .key { margin-inline: 0.1rem; vertical-align: 0.05em; }
+html.dark .sheet-intro {
+  border-color: rgb(99 102 241 / 0.35);
+  background: rgb(99 102 241 / 0.08);
+  color: var(--color-slate-300);
+}
+html.dark .sheet-intro-icon { color: var(--color-brand-300); }
+
+/* In-page filter: status bar, hidden items. */
+.sheet-filter-status {
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 0.75rem;
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  font-size: 0.875rem;
+}
+.sheet-filter-status:not([hidden]) { display: flex; }
+.sheet-filter-status strong { color: var(--color-slate-900); }
+.sheet-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.5rem;
+  color: var(--color-brand-700);
+  font-weight: 500;
+  cursor: pointer;
+}
+.sheet-filter-clear:hover { background: var(--color-brand-50); }
+html.dark .sheet-filter-status {
+  border-color: var(--color-slate-700);
+  background: var(--color-slate-900);
+  color: var(--color-slate-300);
+}
+html.dark .sheet-filter-status strong { color: var(--color-white); }
+html.dark .sheet-filter-clear { color: var(--color-brand-300); }
+html.dark .sheet-filter-clear:hover { background: rgb(99 102 241 / 0.15); }
+[data-filter-hidden] { display: none !important; }
+
+/* Back-to-top button for long sheets. */
+.to-top {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.15);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.5rem);
+  transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+.to-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.to-top:hover { border-color: var(--color-brand-400); color: var(--color-brand-600); }
+html.dark .to-top {
+  border-color: var(--color-slate-700);
+  background: var(--color-slate-800);
+  color: var(--color-slate-200);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+html.dark .to-top:hover { border-color: var(--color-brand-400); color: var(--color-white); }
 
 /* 2-Column Wide Grid on Desktop, 1-Column on Mobile/Tablet */
 .sheet-grid {
@@ -252,7 +408,21 @@ html.dark .sheet-body :not(pre):not(.cmd):not(.cmd-text) > code:not(.cmd-text) {
   .sheet-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* Masonry: BaseLayout.astro sets each card's row span from its real height,
+     so a short card no longer leaves a hole below it. Without JS the plain grid
+     above still works. */
+  .sheet-grid.is-masonry {
+    grid-auto-rows: var(--masonry-row);
+    row-gap: 0;
+  }
 }
+/* Very wide screens: a third column so cards don't stretch into long empty rows. */
+@media (min-width: 1760px) {
+  .sheet-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sheet-grid { --masonry-row: 8px; }
 
 .sheet-section {
   display: flex;
@@ -291,7 +461,8 @@ html.dark .sheet-body :not(pre):not(.cmd):not(.cmd-text) > code:not(.cmd-text) {
 .sheet-section > :not(h2) {
   margin: 0 1.25rem 1.125rem;
 }
-.sheet-section > h2 + * { margin-top: 1.125rem; }
+.sheet-section > h2 + *,
+.sheet-section > [data-filter-first] { margin-top: 1.125rem; }
 .sheet-section > h3 {
   margin-top: 1.35rem;
   margin-bottom: 0.65rem;
@@ -307,14 +478,15 @@ html.dark .sheet-body :not(pre):not(.cmd):not(.cmd-text) > code:not(.cmd-text) {
 .sheet-section > ol,
 .sheet-section > ul { padding-left: 1.25rem; }
 
+/* Dark mode: cards sit clearly above the page (slate-950) instead of blending in. */
 html.dark .sheet-section {
-  border-color: var(--color-slate-800);
-  background: var(--color-slate-900);
-  box-shadow: none;
+  border-color: rgb(51 65 85 / 0.7);
+  background: color-mix(in srgb, var(--color-slate-900) 85%, var(--color-slate-800));
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px rgb(0 0 0 / 0.25);
 }
 html.dark .sheet-section > h2 {
-  border-color: var(--color-slate-800);
-  background: rgb(15 23 42 / 0.7);
+  border-color: rgb(51 65 85 / 0.7);
+  background: rgb(30 41 59 / 0.55);
   color: var(--color-white);
 }
 html.dark .sheet-section > h3 {
@@ -602,6 +774,31 @@ html.dark .sheet-table td:first-child { color: var(--color-slate-300); }
   padding: 0 !important;
 }
 
+/* Long code blocks start collapsed; only with JS, so content is never trapped. */
+.term-expand { display: none; }
+html.js .term-window.is-long:not(.is-expanded) pre {
+  max-height: 17rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 65%, transparent);
+}
+html.js .term-window.is-long .term-expand {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0.55rem;
+  border-top: 1px solid #1e293b;
+  background: #161b22;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+html.js .term-window.is-long .term-expand:hover {
+  background: #1c2330;
+  color: #e0e7ff;
+}
+
 /* Ensure Shiki code inside dark .term-window always uses dark-theme token colors,
    even if a cached dual-theme span is rendered in light mode. */
 .term-window .astro-code[style*='--shiki-dark'],
@@ -637,7 +834,7 @@ html.dark .sheet-table td:first-child { color: var(--color-slate-300); }
   justify-content: space-between;
   gap: 0.75rem;
 }
-.key-table tr + tr {
+.key-table tr:not([data-filter-hidden]) ~ tr {
   padding-top: 0.65rem;
   border-top: 1px solid var(--color-slate-100);
 }
@@ -705,7 +902,7 @@ html.dark .sheet-table td:first-child { color: var(--color-slate-300); }
   font-size: 0.75rem;
   font-weight: 600;
 }
-html.dark .key-table tr + tr { border-color: var(--color-slate-800); }
+html.dark .key-table tr:not([data-filter-hidden]) ~ tr { border-color: var(--color-slate-800); }
 html.dark .key {
   border-color: var(--color-slate-700);
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
@@ -721,25 +918,25 @@ html.dark .key.key-mod {
 /* ==========================================================================
    Definition Tables (.def-table)
    ========================================================================== */
-.def-table tbody { gap: 0.65rem; }
-.def-table tr {
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+/* Two aligned columns (term | description) so the eye reads each pair
+   left to right instead of jumping across the whole card. */
+.def-table tbody {
+  display: grid;
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  column-gap: 1.25rem;
+  row-gap: 0;
 }
-.def-table tr + tr {
-  padding-top: 0.65rem;
+.def-table tr { display: contents; }
+.def-table td { padding-block: 0 0.6rem; }
+.def-table tr:not([data-filter-hidden]) ~ tr td {
+  padding-top: 0.6rem;
   border-top: 1px solid var(--color-slate-100);
 }
-html.dark .def-table tr + tr { border-color: var(--color-slate-800); }
-.def-table td:first-child {
-  flex-shrink: 0;
-}
+html.dark .def-table tr:not([data-filter-hidden]) ~ tr td { border-color: var(--color-slate-800); }
 .def-table td:last-child {
   color: var(--color-slate-600);
   font-size: 0.85rem;
-  text-align: right;
+  line-height: 1.5;
 }
 html.dark .def-table td:last-child { color: var(--color-slate-400); }
 
@@ -747,7 +944,9 @@ html.dark .def-table td:last-child { color: var(--color-slate-400); }
   .toast,
   .cmd,
   .sheet-row,
-  .sheet-toc a { transition: none; }
+  .sheet-toc a,
+  .to-top { transition: none; }
+  .sheet-toc ul { scroll-behavior: auto; }
   html { scroll-behavior: auto; }
 }
 

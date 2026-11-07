@@ -56,7 +56,10 @@ const formattedDate = lastUpdated
 
     {
       sections.length > 1 && (
-        <nav class="sheet-toc" aria-label="Secciones de esta hoja">
+        <nav class="sheet-toc" aria-label="Secciones de esta hoja" data-at-start>
+          <button type="button" class="sheet-toc-arrow" data-dir="-1" aria-label="Ver secciones anteriores" tabindex="-1">
+            <Icon name="mdi:chevron-left" class="h-5 w-5" />
+          </button>
           <ul>
             {sections.map((h) => (
               <li>
@@ -64,11 +67,24 @@ const formattedDate = lastUpdated
               </li>
             ))}
           </ul>
+          <button type="button" class="sheet-toc-arrow" data-dir="1" aria-label="Ver más secciones" tabindex="-1">
+            <Icon name="mdi:chevron-right" class="h-5 w-5" />
+          </button>
         </nav>
       )
     }
 
+    <div id="sheet-filter-status" class="sheet-filter-status" role="status" aria-live="polite" hidden>
+      <span data-filter-summary></span>
+      <button type="button" class="sheet-filter-clear" data-filter-clear>
+        <Icon name="mdi:close" class="h-4 w-4" />
+        Limpiar filtro
+      </button>
+    </div>
+
     <div
+      data-sheet-body
+      data-sheet-title={title}
       class="prose prose-slate sheet-body max-w-none dark:prose-invert prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-a:text-brand-600 dark:prose-a:text-brand-400"
     >
       <slot />

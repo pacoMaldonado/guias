@@ -11,6 +11,8 @@
  *      anything else      -> `def-table`: term / description rows.
  *  - Every fenced `<pre>` code block is wrapped in a `.term-window` with a
  *    macOS-style terminal header bar, language badge, and copy button.
+ *    Blocks longer than COLLAPSE_AFTER_LINES get a "Ver todo" toggle.
+ *  - Text before the first `##` becomes a `.sheet-intro` tip callout.
  */
 
 const text = (node) =>
@@ -234,6 +236,9 @@ const LANG_LABELS = {
   plaintext: 'output',
 };
 
+/** Code blocks longer than this start collapsed behind a "Ver todo" button. */
+const COLLAPSE_AFTER_LINES = 16;
+
 /**
  * Wrap every `<pre>` element in a `.term-window` with a dark terminal header bar
  * and an always-visible copy button.
@@ -245,8 +250,10 @@ function wrapPreBlocks(node) {
       const rawCode = text(child).replace(/\n$/, '');
       const lang = detectLang(child);
       const label = LANG_LABELS[lang] ?? lang;
+      const lines = rawCode.split('\n').length;
+      const isLong = lines > COLLAPSE_AFTER_LINES;
 
-      return el('div', { className: ['term-window', 'not-prose'] }, [
+      return el('div', { className: ['term-window', 'not-prose', ...(isLong ? ['is-long'] : [])] }, [
         el('div', { className: ['term-header'] }, [
           el('div', { className: ['term-title'] }, [
             el('span', { className: ['term-dots'], ariaHidden: 'true' }, [
@@ -273,11 +280,51 @@ function wrapPreBlocks(node) {
           ),
         ]),
         child,
+        // Long blocks start collapsed (only when JS runs, see global.css) with a toggle.
+        ...(isLong
+          ? [
+              el(
+                'button',
+                {
+                  type: 'button',
+                  className: ['term-expand'],
+                  ariaExpanded: 'false',
+                  dataLines: String(lines),
+                },
+                [{ type: 'text', value: `Ver todo (${lines} líneas)` }],
+              ),
+            ]
+          : []),
       ]);
     }
     wrapPreBlocks(child);
     return child;
   });
+}
+
+const INFO_PATH =
+  'M11 9h2V7h-2m1 13c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m-1 15h2v-6h-2z';
+const MODIFIER_KEY = /^(<leader>|Ctrl|Alt|Shift|Espacio|Tab|Esc|Enter|Cmd|Option)$/i;
+
+/** Intro text before the first `##` becomes a "tip" callout; modifier keys render as keycaps. */
+function buildIntro(nodes) {
+  if (!nodes.some((n) => n.type === 'element')) return nodes;
+  const walk = (node) => {
+    node.children = (node.children ?? []).map((child) => {
+      if (isEl(child, 'code') && MODIFIER_KEY.test(text(child).trim())) {
+        return el('kbd', { className: ['key', 'key-mod'] }, [{ type: 'text', value: text(child).trim() }]);
+      }
+      walk(child);
+      return child;
+    });
+  };
+  nodes.forEach(walk);
+  return [
+    el('aside', { className: ['sheet-intro', 'not-prose'] }, [
+      el('span', { className: ['sheet-intro-icon'], ariaHidden: 'true' }, [svg([INFO_PATH], 'sheet-intro-svg')]),
+      el('div', { className: ['sheet-intro-body'] }, nodes),
+    ]),
+  ];
 }
 
 function wrapSections(root) {
@@ -297,7 +344,7 @@ function wrapSections(root) {
   }
 
   if (sections.length === 0) return;
-  root.children = [...intro, el('div', { className: ['sheet-grid'] }, sections)];
+  root.children = [...buildIntro(intro), el('div', { className: ['sheet-grid'] }, sections)];
 }
 
 export default function rehypeCheatsheet() {

@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Sidebar from '../components/Sidebar.astro';
+import { Icon } from 'astro-icon/components';
 import { SITE } from '../consts';
 
 interface Props {
@@ -42,6 +43,8 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
 
     {/* Apply the saved theme before paint to avoid a flash of the wrong theme. */}
     <script is:inline>
+      // Lets CSS enable JS-only enhancements (e.g. collapsed long code blocks).
+      document.documentElement.classList.add('js');
       const stored = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (stored === 'dark' || (!stored && prefersDark)) {
@@ -55,12 +58,16 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
 
     <div class="flex w-full">
       <Sidebar />
-      <main class="page-main min-w-0 flex-1 py-6 sm:py-8 lg:py-10">
+      <main id="main" tabindex="-1" class="page-main min-w-0 flex-1 py-6 outline-none sm:py-8 lg:py-10">
         <slot />
       </main>
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <button type="button" id="to-top" class="to-top" aria-label="Volver arriba" title="Volver arriba">
+      <Icon name="mdi:arrow-up" class="h-5 w-5" />
+    </button>
 
     {/* Clipboard support for every code block on the page. */}
     <script>
@@ -225,9 +232,78 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
         new ResizeObserver(setHeaderHeight).observe(header);
       }
 
-      // Highlight the section being read in the sticky section bar.
+      // Masonry layout for the section cards on desktop: each card spans as many
+      // small grid rows as its real height needs, so cards pack without gaps
+      // while DOM (reading and tab) order stays intact.
+      const grid = document.querySelector<HTMLElement>('.sheet-grid');
+      if (grid) {
+        const desktop = window.matchMedia('(min-width: 1024px)');
+        const cards = [...grid.children] as HTMLElement[];
+        let frame = 0;
+
+        const layout = () => {
+          frame = 0;
+          if (!desktop.matches) {
+            grid.classList.remove('is-masonry');
+            cards.forEach((card) => (card.style.gridRowEnd = ''));
+            return;
+          }
+          const styles = getComputedStyle(grid);
+          const row = parseFloat(styles.getPropertyValue('--masonry-row')) || 8;
+          const gap = parseFloat(styles.columnGap) || 24;
+          grid.classList.add('is-masonry');
+          cards.forEach((card) => {
+            const span = Math.ceil((card.getBoundingClientRect().height + gap) / row);
+            card.style.gridRowEnd = `span ${span}`;
+          });
+        };
+        const schedule = () => {
+          if (!frame) frame = requestAnimationFrame(layout);
+        };
+
+        // Cards change height when fonts load, the window resizes or the theme flips.
+        const resizeObserver = new ResizeObserver(schedule);
+        cards.forEach((card) => resizeObserver.observe(card));
+        desktop.addEventListener('change', schedule);
+        layout();
+      }
+
+      // Sticky section bar: edge fades, arrow buttons and the active section.
+      const toc = document.querySelector<HTMLElement>('.sheet-toc');
+      const tocList = toc?.querySelector<HTMLUListElement>('ul');
       const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.sheet-toc a');
-      if (tocLinks.length) {
+      if (toc && tocList) {
+        const updateEdges = () => {
+          const max = tocList.scrollWidth - tocList.clientWidth;
+          toc.toggleAttribute('data-at-start', tocList.scrollLeft <= 2);
+          toc.toggleAttribute('data-at-end', tocList.scrollLeft >= max - 2);
+        };
+        tocList.addEventListener('scroll', updateEdges, { passive: true });
+        new ResizeObserver(updateEdges).observe(tocList);
+        updateEdges();
+
+        toc.querySelectorAll<HTMLButtonElement>('.sheet-toc-arrow').forEach((arrow) => {
+          arrow.addEventListener('click', () => {
+            const dir = Number(arrow.dataset.dir);
+            tocList.scrollBy({ left: dir * tocList.clientWidth * 0.7 });
+          });
+        });
+
+        // Center the active chip inside the bar without scrolling the page vertically.
+        const revealChip = (link: HTMLAnchorElement) => {
+          const target = link.offsetLeft - (tocList.clientWidth - link.offsetWidth) / 2;
+          tocList.scrollTo({ left: target });
+        };
+        const setActive = (link: HTMLAnchorElement | undefined) => {
+          if (!link || link.hasAttribute('aria-current')) return;
+          tocLinks.forEach((a) => a.removeAttribute('aria-current'));
+          link.setAttribute('aria-current', 'true');
+          revealChip(link);
+        };
+
+        // Clicking a chip marks it right away instead of waiting for the scroll.
+        tocLinks.forEach((link) => link.addEventListener('click', () => setActive(link)));
+
         const byId = new Map(
           [...tocLinks].map((a) => [decodeURIComponent(a.hash.slice(1)), a] as const),
         );
@@ -236,15 +312,37 @@ const ogImage = new URL('/og-image.png', Astro.site ?? Astro.url.origin).toStrin
             for (const entry of entries) {
               if (!entry.isIntersecting) continue;
               const id = entry.target.querySelector('h2')?.id ?? '';
-              tocLinks.forEach((a) => a.removeAttribute('aria-current'));
-              const link = byId.get(id);
-              link?.setAttribute('aria-current', 'true');
-              link?.scrollIntoView({ block: 'nearest', inline: 'center' });
+              setActive(byId.get(id));
             }
           },
           { rootMargin: '-25% 0px -65% 0px' },
         );
         document.querySelectorAll('.sheet-section').forEach((section) => observer.observe(section));
+      }
+
+      // Expand / collapse long code blocks.
+      document.querySelectorAll<HTMLButtonElement>('.term-expand').forEach((button) => {
+        const lines = button.dataset.lines ?? '';
+        button.addEventListener('click', () => {
+          const win = button.closest('.term-window');
+          const expanded = win?.classList.toggle('is-expanded') ?? false;
+          button.setAttribute('aria-expanded', String(expanded));
+          button.textContent = expanded ? 'Ver menos' : `Ver todo (${lines} líneas)`;
+          if (!expanded) win?.scrollIntoView({ block: 'nearest' });
+        });
+      });
+
+      // Back-to-top button after scrolling past roughly one screen.
+      const toTop = document.getElementById('to-top');
+      if (toTop) {
+        const toggleToTop = () =>
+          toTop.classList.toggle('is-visible', window.scrollY > window.innerHeight * 0.8);
+        window.addEventListener('scroll', toggleToTop, { passive: true });
+        toggleToTop();
+        toTop.addEventListener('click', () => {
+          window.scrollTo({ top: 0 });
+          document.querySelector<HTMLElement>('main')?.focus({ preventScroll: true });
+        });
       }
     </script>
   </body>
