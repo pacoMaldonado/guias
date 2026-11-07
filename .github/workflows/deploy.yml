@@ -1,15 +1,27 @@
 # =============================================================================
-# Deploy pipeline — build the Astro site once and publish it to S3 + CloudFront
+# Deploy pipeline — build the Astro site and publish it to S3 + CloudFront
 #
-#   push → main        : build, then deploy dev → qa → prod
-#   workflow_dispatch  : build, then deploy a single environment
+# Every run targets exactly ONE environment, resolved from the branch:
+#
+#   branch    environment   enabled by
+#   -------   -----------   -----------------------------------------
+#   main      prod          always
+#   staging   qa            repository variable ENABLE_QA  = "true"
+#   dev       dev           repository variable ENABLE_DEV = "true"
+#
+#   push → <branch>    : build + deploy that branch's environment
+#   workflow_dispatch  : build + deploy the chosen environment (prod only from main)
+#
+# A disabled environment is skipped (not failed), so dev and qa can be turned
+# on later without touching this file.
 #
 # Authentication: GitHub OIDC → role-maldolabs-guias-<env>-site-deploy
 # (created by the infra-web-guias repository). No AWS keys are stored.
 #
-# Repository variable:
+# Repository variables:
 #   AWS_REGION                  = us-east-1
-# GitHub environment variables (dev, qa, prod — values from `terraform output`):
+#   ENABLE_QA / ENABLE_DEV      = "true" to enable those environments (optional)
+# GitHub environment variables (per environment — values from `terraform output`):
 #   AWS_ROLE_ARN                = site_deploy_role_arn
 #   S3_BUCKET                   = site_bucket_name
 #   CLOUDFRONT_DISTRIBUTION_ID  = cloudfront_distribution_id
@@ -18,14 +30,14 @@ name: deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging, dev]
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to deploy"
+        description: "Environment to deploy (prod only from main)"
         required: true
         type: choice
-        options: [dev, qa, prod]
+        options: [prod, qa, dev]
 
 permissions:
   contents: read
@@ -36,9 +48,61 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build once; every environment receives the exact same artifact.
+  # Resolve the target environment and whether it is enabled
+  # ---------------------------------------------------------------------------
+  target:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      enabled: ${{ steps.resolve.outputs.enabled }}
+    steps:
+      - id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_ENV: ${{ inputs.environment }}
+          REF_NAME: ${{ github.ref_name }}
+          ENABLE_QA: ${{ vars.ENABLE_QA }}
+          ENABLE_DEV: ${{ vars.ENABLE_DEV }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            ENVIRONMENT="$INPUT_ENV"
+          else
+            case "$REF_NAME" in
+              main)    ENVIRONMENT=prod ;;
+              staging) ENVIRONMENT=qa ;;
+              dev)     ENVIRONMENT=dev ;;
+              *) echo "::error::Branch '$REF_NAME' is not mapped to an environment"; exit 1 ;;
+            esac
+          fi
+
+          # Prod is only deployed from code that is already on main.
+          if [ "$ENVIRONMENT" = "prod" ] && [ "$REF_NAME" != "main" ]; then
+            echo "::error::prod can only be deployed from the main branch (current: $REF_NAME)"
+            exit 1
+          fi
+
+          case "$ENVIRONMENT" in
+            prod) ENABLED=true ;;
+            qa)   ENABLED="$ENABLE_QA" ;;
+            dev)  ENABLED="$ENABLE_DEV" ;;
+          esac
+          [ "$ENABLED" = "true" ] || ENABLED=false
+
+          if [ "$ENABLED" = "false" ]; then
+            VAR_NAME="ENABLE_$(echo "$ENVIRONMENT" | tr '[:lower:]' '[:upper:]')"
+            echo "::notice::Environment '$ENVIRONMENT' is disabled. Set the repository variable $VAR_NAME=true to enable it."
+          fi
+
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"
+          echo "### Target: \`$ENVIRONMENT\` (enabled: $ENABLED)" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Build (only when the target environment is enabled)
   # ---------------------------------------------------------------------------
   build:
+    needs: target
+    if: needs.target.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -66,44 +130,13 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
-  # Deploy jobs (one per environment, gated by GitHub environments)
+  # Deploy the target environment only
   # ---------------------------------------------------------------------------
-  deploy-dev:
-    needs: build
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')
+  deploy:
+    needs: [target, build]
     uses: ./.github/workflows/deploy-environment.yml
     with:
-      environment: dev
-    permissions:
-      contents: read
-      id-token: write
-
-  deploy-qa:
-    needs: [build, deploy-dev]
-    if: >-
-      always() && needs.build.result == 'success' && (
-        (github.event_name == 'push' && needs.deploy-dev.result == 'success') ||
-        (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa')
-      )
-    uses: ./.github/workflows/deploy-environment.yml
-    with:
-      environment: qa
-    permissions:
-      contents: read
-      id-token: write
-
-  deploy-prod:
-    needs: [build, deploy-qa]
-    if: >-
-      always() && needs.build.result == 'success' && (
-        (github.event_name == 'push' && needs.deploy-qa.result == 'success') ||
-        (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
-      )
-    uses: ./.github/workflows/deploy-environment.yml
-    with:
-      environment: prod
+      environment: ${{ needs.target.outputs.environment }}
     permissions:
       contents: read
       id-token: write
