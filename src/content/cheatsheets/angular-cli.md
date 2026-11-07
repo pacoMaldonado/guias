@@ -15,11 +15,11 @@ Dos opciones que se repiten mucho: `--directory .` crea el proyecto en la carpet
 
 | Acción | Comando |
 | --- | --- |
-| Instalar la CLI globalmente | `npm i -g @angular/cli` |
-| Instalar la versión 22 exacta | `npm i -g @angular/cli@22` |
+| Instalar la CLI globalmente | `pnpm add -g @angular/cli` |
+| Instalar la versión 22 exacta | `pnpm add -g @angular/cli@22` |
 | Verificar la versión instalada | `ng version` o `ng v` |
-| Desinstalar la CLI global | `npm uninstall -g @angular/cli` |
-| Limpiar la caché de NPM | `npm cache clean --force` |
+| Desinstalar la CLI global | `pnpm remove -g @angular/cli` |
+| Limpiar el store de pnpm (paquetes sin uso) | `pnpm store prune` |
 | Ver la ayuda general | `ng help` |
 | Configurar Analytics de Angular | `ng analytics [on\|off]` |
 
@@ -35,7 +35,8 @@ Dos opciones que se repiten mucho: `--directory .` crea el proyecto en la carpet
 | Sin SSR (solo SPA, client-only) | `ng new mi-app --ssr=false` |
 | Sin archivos de test (`.spec.ts`) | `ng new mi-app --skip-tests` |
 | Sin inicializar el repositorio Git | `ng new mi-app --skip-git` |
-| Sin instalación inicial (`npm i`) | `ng new mi-app --skip-install` |
+| Usar pnpm como gestor de paquetes | `ng new mi-app --package-manager=pnpm` |
+| Sin instalación inicial (`pnpm install`) | `ng new mi-app --skip-install` |
 | Aceptar los valores por defecto | `ng new mi-app --defaults` |
 
 ## Servidor local y red (ng serve)
@@ -88,11 +89,11 @@ Si no carga:
   "watch": "ng build --watch --configuration development",
   "test": "ng test",
   "test:ci": "ng test --watch=false --code-coverage",
-  "clean": "rm -rf .angular/cache dist node_modules package-lock.json && npm i"
+  "clean": "rm -rf .angular/cache dist node_modules && pnpm install"
 }
 ```
 
-Con esto puedes ejecutar `npm run start:host`.
+Con esto puedes ejecutar `pnpm run start:host`.
 
 ### Host y puerto fijos en angular.json
 
@@ -157,14 +158,14 @@ Para que siempre levante en red, defínelos en `angular.json`:
 ### Reparar node_modules y caché
 
 ```bash
-# Full clean reinstall
-rm -rf node_modules package-lock.json && npm i
+# Full clean reinstall (keeps pnpm-lock.yaml so versions stay pinned)
+rm -rf node_modules && pnpm install
 
 # Clear the Angular build cache
 rm -rf .angular/cache
 
 # Fix vulnerable dependencies
-npm audit fix
+pnpm audit --fix
 ```
 
 ## Schematics y librerías (ng add)
@@ -174,7 +175,7 @@ npm audit fix
 | Añadir Angular Material | `ng add @angular/material` |
 | Añadir PWA / Service Worker | `ng add @angular/pwa` |
 | Añadir Angular Localize (i18n) | `ng add @angular/localize` |
-| Añadir Tailwind CSS | `npm i -D tailwindcss postcss autoprefixer` |
+| Añadir Tailwind CSS | `pnpm add -D tailwindcss postcss autoprefixer` |
 | Generar un componente Material (tabla) | `ng g @angular/material:table mi-tabla` |
 | Generar navegación / sidebar de Material | `ng g @angular/material:nav mi-nav` |
 

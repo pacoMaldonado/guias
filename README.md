@@ -38,16 +38,16 @@ CloudFront.
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start the dev server at http://localhost:4321
-npm run dev
+pnpm run dev
 
 # Type-check and build the static site into dist/
-npm run build
+pnpm run build
 
 # Preview the production build locally
-npm run preview
+pnpm run preview
 ```
 
 ## Project structure
@@ -103,7 +103,7 @@ Set `isDraft: true` to keep a sheet out of the published site and search index.
 
 ## Deployment (AWS S3 + CloudFront)
 
-`npm run build` emits a static site to `dist/`. The DevOps team syncs that
+`pnpm run build` emits a static site to `dist/`. The DevOps team syncs that
 directory to the S3 bucket and invalidates the CloudFront cache, for example:
 
 ```bash

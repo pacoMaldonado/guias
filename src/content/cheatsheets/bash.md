@@ -33,7 +33,7 @@ Trucos y comandos de shell para moverte más rápido por la terminal.
 | Acción | Comando |
 | --- | --- |
 | Filtrar la salida y contar las líneas | `cat access.log \| grep "500" \| wc -l` |
-| Redirigir `stdout` y `stderr` a un archivo | `npm run build > build.log 2>&1` |
+| Redirigir `stdout` y `stderr` a un archivo | `pnpm run build > build.log 2>&1` |
 | Seguir un archivo de log en tiempo real | `tail -f /var/log/syslog` |
 
 ## Procesos y puertos
