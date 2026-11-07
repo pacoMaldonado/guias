@@ -1,0 +1,78 @@
+#!/bin/bash
+# .githooks/post-merge
+# Detecta cambios en archivos de dependencias tras un pull/merge
+# y avisa qué comando ejecutar según el lenguaje/stack
+
+function archivos_cambiaron() {
+  git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD | grep -q "$1"
+}
+
+AVISO=false
+
+# ── PHP / Laravel ────────────────────────────────────────────────────
+if archivos_cambiaron "composer.json" || archivos_cambiaron "composer.lock"; then
+  echo ""
+  echo "📦 [PHP] Dependencias cambiaron → ejecuta: composer install"
+  AVISO=true
+fi
+
+# ── Node.js / npm ────────────────────────────────────────────────────
+if archivos_cambiaron "package.json" || archivos_cambiaron "package-lock.json"; then
+  echo ""
+  echo "📦 [Node.js] Dependencias cambiaron → ejecuta: npm install"
+  AVISO=true
+fi
+
+# ── Node.js / yarn ───────────────────────────────────────────────────
+if archivos_cambiaron "yarn.lock"; then
+  echo ""
+  echo "📦 [Yarn] Dependencias cambiaron → ejecuta: yarn install"
+  AVISO=true
+fi
+
+# ── Python / pip ─────────────────────────────────────────────────────
+if archivos_cambiaron "requirements.txt" || archivos_cambiaron "requirements-dev.txt"; then
+  echo ""
+  echo "📦 [Python] Dependencias cambiaron → ejecuta: pip install -r requirements.txt"
+  AVISO=true
+fi
+
+# ── Python / Poetry ──────────────────────────────────────────────────
+if archivos_cambiaron "pyproject.toml" || archivos_cambiaron "poetry.lock"; then
+  echo ""
+  echo "📦 [Poetry] Dependencias cambiaron → ejecuta: poetry install"
+  AVISO=true
+fi
+
+# ── Python / Pipenv ──────────────────────────────────────────────────
+if archivos_cambiaron "Pipfile" || archivos_cambiaron "Pipfile.lock"; then
+  echo ""
+  echo "📦 [Pipenv] Dependencias cambiaron → ejecuta: pipenv install"
+  AVISO=true
+fi
+
+# ── Flutter / Dart ───────────────────────────────────────────────────
+if archivos_cambiaron "pubspec.yaml" || archivos_cambiaron "pubspec.lock"; then
+  echo ""
+  echo "📦 [Flutter] Dependencias cambiaron → ejecuta: flutter pub get"
+  AVISO=true
+fi
+
+# ── AWS / Infraestructura ────────────────────────────────────────────
+if archivos_cambiaron "template.yaml" || archivos_cambiaron "samconfig.toml"; then
+  echo ""
+  echo "☁️  [AWS SAM] Template cambió → revisa si necesitas: sam build"
+  AVISO=true
+fi
+
+if archivos_cambiaron ".env.example"; then
+  echo ""
+  echo "⚠️  [ENV] El archivo .env.example cambió → revisa si tu .env local necesita nuevas variables"
+  AVISO=true
+fi
+
+if [ "$AVISO" = true ]; then
+  echo ""
+fi
+
+exit 0

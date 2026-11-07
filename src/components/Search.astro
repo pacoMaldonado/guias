@@ -1,0 +1,311 @@
+---
+import { Icon } from 'astro-icon/components';
+import { getSearchIndex } from '../lib/content';
+
+// The index is built at compile time and embedded in the page, so search runs
+// fully client-side with no backend — a good fit for a static S3/CloudFront site.
+// On a cheat sheet page the same box also filters that sheet's rows in place.
+const searchIndex = await getSearchIndex();
+---
+
+<div class="relative w-full" data-search-root>
+  <label class="relative block">
+    <span class="sr-only">Buscar hojas de trucos</span>
+    <Icon
+      name="mdi:magnify"
+      class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+    />
+    <input
+      type="search"
+      autocomplete="off"
+      placeholder="Buscar comandos, etiquetas o categorías…"
+      class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 sm:pr-12 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+      data-search-input
+      aria-label="Buscar hojas de trucos"
+      aria-keyshortcuts="/ Control+K"
+    />
+    <kbd
+      class="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[0.7rem] text-slate-500 sm:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+      data-search-hint
+      aria-hidden="true">/</kbd
+    >
+  </label>
+
+  <div
+    class="absolute left-0 right-0 top-full z-40 mt-2 hidden max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+    data-search-results
+    role="listbox"
+  >
+  </div>
+</div>
+
+<script define:vars={{ searchIndex }}>
+  // define:vars scripts run inline while the header is parsed, before the sheet body
+  // exists, so setup waits for the DOM.
+  const initSearch = () => {
+  const root = document.querySelector('[data-search-root]');
+  if (root) {
+    const input = root.querySelector('[data-search-input]');
+    const results = root.querySelector('[data-search-results]');
+    const hint = root.querySelector('[data-search-hint]');
+
+    const normalize = (value) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '');
+
+    const escapeHtml = (value) =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // ---------------------------------------------------------------------
+    // In-page filter (only on cheat sheet pages)
+    // ---------------------------------------------------------------------
+    const body = document.querySelector('[data-sheet-body]');
+    const status = document.getElementById('sheet-filter-status');
+    const summary = status?.querySelector('[data-filter-summary]');
+    const currentPath = window.location.pathname.replace(/\/$/, '');
+
+    // Searchable text of an element, without the "Copiar / ¡Copiado!" button labels.
+    const searchableText = (element) => {
+      const clone = element.cloneNode(true);
+      clone.querySelectorAll('.cmd-state, .copy-btn, .term-expand').forEach((n) => n.remove());
+      return normalize(clone.textContent ?? '');
+    };
+
+    // Each section is split into groups led by an optional h3; each item is a table row
+    // or a block (paragraph, list, code window) so matches can be shown one by one.
+    const sections = body
+      ? [...body.querySelectorAll('.sheet-section')].map((section) => {
+          const heading = section.querySelector(':scope > h2');
+          const groups = [{ title: null, items: [] }];
+          for (const child of section.children) {
+            if (child === heading) continue;
+            if (child.tagName === 'H3') {
+              groups.push({ title: { el: child, text: searchableText(child) }, items: [] });
+              continue;
+            }
+            const rows = child.tagName === 'TABLE' ? [...child.querySelectorAll('tbody tr')] : [child];
+            rows.forEach((row) =>
+              groups[groups.length - 1].items.push({ el: row, text: searchableText(row) }),
+            );
+          }
+          return { el: section, title: searchableText(heading ?? section), groups };
+        })
+      : [];
+
+    const setHidden = (element, hidden) => element.toggleAttribute('data-filter-hidden', hidden);
+
+    const filterSheet = (rawQuery) => {
+      const terms = normalize(rawQuery).split(/\s+/).filter(Boolean);
+      const intro = body.querySelector('.sheet-intro');
+
+      if (terms.length === 0) {
+        body.querySelectorAll('[data-filter-hidden]').forEach((n) => setHidden(n, false));
+        body.querySelectorAll('[data-filter-first]').forEach((n) => n.removeAttribute('data-filter-first'));
+        if (status) status.hidden = true;
+        return -1;
+      }
+
+      const matches = (text) => terms.every((term) => text.includes(term));
+      let total = 0;
+      let visibleSections = 0;
+
+      for (const section of sections) {
+        const showAll = matches(section.title);
+        let sectionCount = 0;
+        for (const group of section.groups) {
+          const groupAll = showAll || (group.title !== null && matches(group.title.text));
+          let groupCount = 0;
+          for (const item of group.items) {
+            const visible = groupAll || matches(item.text);
+            setHidden(item.el, !visible);
+            if (visible) groupCount += 1;
+          }
+          if (group.title) setHidden(group.title.el, groupCount === 0 && !groupAll);
+          sectionCount += groupCount;
+        }
+        // A table whose rows are all filtered out would still leave its margins behind.
+        section.el.querySelectorAll(':scope > table').forEach((table) => {
+          setHidden(table, !table.querySelector('tbody tr:not([data-filter-hidden])'));
+        });
+        setHidden(section.el, sectionCount === 0 && !showAll);
+        // The first visible block takes over the spacing below the card title.
+        section.el.querySelector('[data-filter-first]')?.removeAttribute('data-filter-first');
+        section.el
+          .querySelector(':scope > :not(h2):not([data-filter-hidden])')
+          ?.setAttribute('data-filter-first', '');
+        if (sectionCount > 0 || showAll) visibleSections += 1;
+        total += sectionCount;
+      }
+
+      if (intro) setHidden(intro, true);
+      if (status && summary) {
+        const q = escapeHtml(rawQuery.trim());
+        summary.innerHTML =
+          total > 0
+            ? `<strong>${total}</strong> ${total === 1 ? 'resultado' : 'resultados'} para “${q}” en ${visibleSections} ${visibleSections === 1 ? 'sección' : 'secciones'}`
+            : `Sin resultados para “${q}” en esta hoja.`;
+        status.hidden = false;
+      }
+      return total;
+    };
+
+    // Bring the results into view when a filter starts while scrolled down.
+    const revealResults = () => {
+      if (!status) return;
+      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 64;
+      const top = status.getBoundingClientRect().top + window.scrollY - headerH - 72;
+      if (window.scrollY > top) window.scrollTo({ top: Math.max(0, top) });
+    };
+
+    // ---------------------------------------------------------------------
+    // Sheet search (dropdown)
+    // ---------------------------------------------------------------------
+    const searchSheets = (rawQuery) => {
+      const terms = normalize(rawQuery).split(/\s+/).filter(Boolean);
+      if (terms.length === 0) return [];
+      return searchIndex.filter((item) => {
+        const haystack = normalize(
+          [item.title, item.description, item.category, item.tags.join(' ')].join(' '),
+        );
+        return terms.every((term) => haystack.includes(term));
+      });
+    };
+
+    const renderDropdown = (matches, query, heading) => {
+      if (!query) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+        return;
+      }
+      if (matches.length === 0) {
+        results.innerHTML =
+          '<p class="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">No se encontraron resultados.</p>';
+        results.classList.remove('hidden');
+        return;
+      }
+      const title = heading
+        ? `<p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">${heading}</p>`
+        : '';
+      results.innerHTML =
+        title +
+        matches
+          .slice(0, 8)
+          .map(
+            (item) => `
+            <a href="${item.url}" role="option"
+               class="block rounded-lg px-3 py-2 transition hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-slate-800">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium text-slate-800 dark:text-slate-100">${escapeHtml(item.title)}</span>
+                <span class="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">${escapeHtml(item.category)}</span>
+              </div>
+              <p class="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">${escapeHtml(item.description)}</p>
+            </a>`,
+          )
+          .join('');
+      results.classList.remove('hidden');
+    };
+
+    if (body) {
+      input.placeholder = `Filtrar en ${body.dataset.sheetTitle ?? 'esta hoja'}…`;
+      input.setAttribute('aria-label', `Filtrar en ${body.dataset.sheetTitle ?? 'esta hoja'} o buscar otras hojas`);
+    }
+
+    let wasFiltering = false;
+    const run = () => {
+      const query = input.value.trim();
+      if (hint) hint.classList.toggle('sm:block', query === '');
+
+      if (!body) {
+        renderDropdown(searchSheets(query), query);
+        return;
+      }
+
+      const count = filterSheet(query);
+      if (query && !wasFiltering) revealResults();
+      wasFiltering = Boolean(query);
+
+      // Suggest other sheets only when this one has nothing for the query.
+      if (count === 0) {
+        const others = searchSheets(query).filter((item) => item.url.replace(/\/$/, '') !== currentPath);
+        if (others.length) renderDropdown(others, query, 'En otras hojas');
+        else renderDropdown([], '');
+      } else {
+        renderDropdown([], '');
+      }
+    };
+
+    const clear = () => {
+      input.value = '';
+      run();
+    };
+
+    input.addEventListener('input', run);
+    status?.querySelector('[data-filter-clear]')?.addEventListener('click', () => {
+      clear();
+      input.focus();
+    });
+
+    // Close the dropdown when clicking outside.
+    document.addEventListener('click', (event) => {
+      if (!root.contains(event.target)) results.classList.add('hidden');
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        clear();
+        input.blur();
+      } else if (event.key === 'Enter') {
+        const first = results.querySelector('a');
+        if (first && !results.classList.contains('hidden')) {
+          event.preventDefault();
+          window.location.href = first.getAttribute('href');
+        }
+      } else if (event.key === 'ArrowDown') {
+        const first = results.querySelector('a');
+        if (first && !results.classList.contains('hidden')) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    // Arrow keys move between results; Escape returns to the input.
+    results.addEventListener('keydown', (event) => {
+      const links = [...results.querySelectorAll('a')];
+      const index = links.indexOf(document.activeElement);
+      if (event.key === 'ArrowDown' && index < links.length - 1) {
+        event.preventDefault();
+        links[index + 1].focus();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        (index > 0 ? links[index - 1] : input).focus();
+      } else if (event.key === 'Escape') {
+        input.focus();
+      }
+    });
+
+    // "/" or Ctrl/Cmd+K focuses the search box from anywhere on the page.
+    document.addEventListener('keydown', (event) => {
+      const target = event.target;
+      const typing =
+        target instanceof HTMLElement &&
+        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      const isSlash = event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey;
+      const isCmdK = event.key.toLowerCase() === 'k' && (event.ctrlKey || event.metaKey);
+      if (isSlash || isCmdK) {
+        event.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+  }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSearch);
+  } else {
+    initSearch();
+  }
+</script>

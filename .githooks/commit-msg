@@ -1,0 +1,59 @@
+#!/bin/bash
+# .githooks/commit-msg
+# Valida que el mensaje siga el formato del template .gitmessage:
+#   tipo(alcance): descripción    ← con alcance (opcional)
+#   tipo: descripción             ← sin alcance
+
+MENSAJE=$(cat "$1")
+
+# Ignorar líneas de comentario y merge commits
+PRIMERA_LINEA=$(echo "$MENSAJE" | grep -v "^#" | head -1)
+
+if [ -z "$PRIMERA_LINEA" ]; then
+  echo ""
+  echo "🚫 [COMMIT] El mensaje no puede estar vacío."
+  exit 1
+fi
+
+# Eliminar prefijo de rama inyectado por prepare-commit-msg: [rama] ...
+LINEA_LIMPIA=$(echo "$PRIMERA_LINEA" | sed 's/^\[.*\] //')
+
+# Tipos válidos (deben coincidir con los del .gitmessage)
+TIPOS="feat|fix|docs|style|refactor|test|chore|perf|hotfix|wip"
+
+# Patrón: tipo(alcance_opcional): descripción mínimo 5 chars
+PATRON="^($TIPOS)(\([a-z0-9_-]+\))?: .{5,}"
+
+if ! echo "$LINEA_LIMPIA" | grep -qE "$PATRON"; then
+  echo ""
+  echo "🚫 [COMMIT] Formato de mensaje inválido."
+  echo ""
+  echo "   Recibido:  $PRIMERA_LINEA"
+  echo ""
+  echo "   Formato:   tipo(alcance): descripción"
+  echo "              tipo: descripción"
+  echo ""
+  echo "   Tipos:     feat, fix, docs, style, refactor,"
+  echo "              test, chore, perf, hotfix, wip"
+  echo ""
+  echo "   Ejemplos:"
+  echo "     feat(auth): add JWT token validation"
+  echo "     fix(ui): resolve modal overlay issue"
+  echo "     chore: update dependencies"
+  echo ""
+  echo "   Tip: ejecuta 'git commit' (sin -m) para abrir el template."
+  echo ""
+  exit 1
+fi
+
+# Validar largo de la línea limpia (máx 72 chars como dice el template)
+LARGO=${#LINEA_LIMPIA}
+if [ "$LARGO" -gt 72 ]; then
+  echo ""
+  echo "⚠️  [COMMIT] La primera línea tiene $LARGO caracteres (máximo 72)."
+  echo "   Acorta la descripción."
+  echo ""
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,93 @@
+---
+import { Icon } from 'astro-icon/components';
+import BaseLayout from './BaseLayout.astro';
+import type { CheatSheet } from '../lib/content';
+
+interface Props {
+  sheet: CheatSheet;
+  headings?: { depth: number; slug: string; text: string }[];
+}
+
+const { sheet, headings = [] } = Astro.props;
+const sections = headings.filter((h) => h.depth === 2);
+const { title, description, category, icon, tags, lastUpdated } = sheet.data;
+
+const formattedDate = lastUpdated
+  ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(lastUpdated)
+  : null;
+---
+
+<BaseLayout title={title} description={description}>
+  <article class="w-full">
+    <header class="mb-6 sm:mb-8">
+      <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+        >
+          <Icon name={icon} class="h-4 w-4" />
+          {category}
+        </span>
+        {
+          formattedDate && (
+            <span class="text-xs text-slate-500 dark:text-slate-400">
+              Actualizado el {formattedDate}
+            </span>
+          )
+        }
+      </div>
+
+      <h1 class="font-display text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+        {title}
+      </h1>
+      <p class="mt-3 max-w-3xl text-base text-slate-600 sm:text-lg dark:text-slate-400">{description}</p>
+
+      {
+        tags.length > 0 && (
+          <ul class="mt-4 flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <li class="rounded-md bg-slate-200/60 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                #{tag}
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </header>
+
+    {
+      sections.length > 1 && (
+        <nav class="sheet-toc" aria-label="Secciones de esta hoja" data-at-start>
+          <button type="button" class="sheet-toc-arrow" data-dir="-1" aria-label="Ver secciones anteriores" tabindex="-1">
+            <Icon name="mdi:chevron-left" class="h-5 w-5" />
+          </button>
+          <ul>
+            {sections.map((h) => (
+              <li>
+                <a href={`#${h.slug}`}>{h.text}</a>
+              </li>
+            ))}
+          </ul>
+          <button type="button" class="sheet-toc-arrow" data-dir="1" aria-label="Ver más secciones" tabindex="-1">
+            <Icon name="mdi:chevron-right" class="h-5 w-5" />
+          </button>
+        </nav>
+      )
+    }
+
+    <div id="sheet-filter-status" class="sheet-filter-status" role="status" aria-live="polite" hidden>
+      <span data-filter-summary></span>
+      <button type="button" class="sheet-filter-clear" data-filter-clear>
+        <Icon name="mdi:close" class="h-4 w-4" />
+        Limpiar filtro
+      </button>
+    </div>
+
+    <div
+      data-sheet-body
+      data-sheet-title={title}
+      class="prose prose-slate sheet-body max-w-none dark:prose-invert prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-a:text-brand-600 dark:prose-a:text-brand-400"
+    >
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

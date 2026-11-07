@@ -1,0 +1,48 @@
+---
+import { Code } from 'astro:components';
+import { Icon } from 'astro-icon/components';
+
+/**
+ * Reusable syntax-highlighted code block with a "copy to clipboard" button.
+ *
+ * Markdown fenced code blocks are enhanced automatically by rehypeCheatsheet, so
+ * this component is only needed for explicit use inside `.mdx` content, e.g.:
+ *
+ *   <CodeBlock lang="bash" code={`pnpm install\npnpm run dev`} title="Setup" />
+ */
+interface Props {
+  code: string;
+  /** A Shiki language identifier, e.g. "bash", "ts", "css". */
+  lang?: string;
+  title?: string;
+}
+
+const { code, lang = 'bash', title } = Astro.props;
+---
+
+<figure class="term-window not-prose my-4">
+  <figcaption class="term-header">
+    <div class="term-title">
+      <span class="term-dots" aria-hidden="true">
+        <span class="term-dot term-dot-red"></span>
+        <span class="term-dot term-dot-amber"></span>
+        <span class="term-dot term-dot-green"></span>
+      </span>
+      <span class="term-lang">{title ?? lang}</span>
+    </div>
+
+    <button
+      type="button"
+      class="copy-btn"
+      data-code={code}
+      aria-label="Copiar código"
+    >
+      <Icon name="mdi:content-copy" class="cmd-icon-copy h-4 w-4" />
+      <Icon name="mdi:check" class="cmd-icon-done h-4 w-4" />
+      <span class="cmd-state-label">Copiar</span>
+      <span class="cmd-state-done">¡Copiado!</span>
+    </button>
+  </figcaption>
+
+  <Code code={code} lang={lang as any} theme="github-dark" />
+</figure>

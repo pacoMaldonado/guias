@@ -1,0 +1,21 @@
+---
+import type { GetStaticPaths } from 'astro';
+import CheatSheetLayout from '../layouts/CheatSheetLayout.astro';
+import { getPublishedCheatSheets } from '../lib/content';
+
+// Pre-render one static page per published cheat sheet at build time (SSG).
+export const getStaticPaths = (async () => {
+  const sheets = await getPublishedCheatSheets();
+  return sheets.map((sheet) => ({
+    params: { slug: sheet.slug },
+    props: { sheet },
+  }));
+}) satisfies GetStaticPaths;
+
+const { sheet } = Astro.props;
+const { Content, headings } = await sheet.render();
+---
+
+<CheatSheetLayout sheet={sheet} headings={headings}>
+  <Content />
+</CheatSheetLayout>

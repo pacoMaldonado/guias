@@ -1,0 +1,127 @@
+---
+import { Icon } from 'astro-icon/components';
+import { getCheatSheetsByCategory, sheetUrl } from '../lib/content';
+import { SITE } from '../consts';
+
+const groups = await getCheatSheetsByCategory();
+
+// Current path without trailing slash, used to highlight the active link.
+const current = Astro.url.pathname.replace(/\/$/, '');
+const isActive = (href: string) => current === href.replace(/\/$/, '');
+---
+
+<!-- Backdrop shown behind the off-canvas sidebar on mobile. -->
+<div
+  id="sidebar-backdrop"
+  class="fixed inset-0 z-30 hidden bg-slate-900/50 backdrop-blur-sm lg:hidden"
+  aria-hidden="true"
+>
+</div>
+
+<aside
+  id="sidebar"
+  class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 -translate-x-full overflow-y-auto border-r border-slate-200 bg-white px-3 py-6 transition-transform duration-200 ease-out lg:sticky lg:top-[var(--header-h,4rem)] lg:z-0 lg:h-[calc(100vh-var(--header-h,4rem))] xl:w-72 lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950"
+  aria-label="Navegación de categorías"
+>
+  <div class="mb-4 flex items-center justify-between lg:hidden">
+    <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">
+      Categorías
+    </span>
+    <button
+      id="sidebar-close"
+      type="button"
+      class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+      aria-label="Cerrar menú"
+    >
+      <Icon name="mdi:close" class="h-5 w-5" />
+    </button>
+  </div>
+
+  <nav class="space-y-6">
+    {
+      groups.length === 0 && (
+        <p class="px-2 text-sm text-slate-500 dark:text-slate-400">
+          Aún no hay hojas de trucos publicadas.
+        </p>
+      )
+    }
+
+    {
+      groups.map((group) => (
+        <div>
+          <h3 class="flex items-center gap-2 px-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <Icon name={group.icon} class="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            {group.label}
+            <span
+              class="ml-auto rounded-full bg-slate-200/70 px-2 py-0.5 text-[0.6875rem] font-medium text-slate-500 tabular-nums dark:bg-slate-800 dark:text-slate-400"
+              aria-label={`${group.sheets.length} ${group.sheets.length === 1 ? 'hoja' : 'hojas'}`}
+            >
+              {group.sheets.length}
+            </span>
+          </h3>
+          <ul class="mt-2 space-y-0.5">
+            {group.sheets.map((sheet) => {
+              const href = sheetUrl(sheet);
+              const active = isActive(href);
+              return (
+                <li>
+                  <a
+                    href={href}
+                    aria-current={active ? 'page' : undefined}
+                    class:list={[
+                      'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition',
+                      active
+                        ? 'bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                    ]}
+                  >
+                    <Icon name={sheet.data.icon} class="h-4 w-4 shrink-0 opacity-70" />
+                    <span class="truncate">{sheet.data.title}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))
+    }
+  </nav>
+
+  <p class="mt-8 border-t border-slate-100 px-2 pt-4 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-600">
+    {SITE.title} · {SITE.tagline}
+  </p>
+</aside>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const closeBtn = document.getElementById('sidebar-close');
+
+  const close = () => {
+    sidebar?.classList.add('-translate-x-full');
+    backdrop?.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  };
+
+  // Opened from the header hamburger (see Header.astro).
+  window.addEventListener('guias:toggle-sidebar', () => {
+    const isOpen = !sidebar?.classList.contains('-translate-x-full');
+    if (isOpen) {
+      close();
+    } else {
+      sidebar?.classList.remove('-translate-x-full');
+      backdrop?.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+  });
+
+  backdrop?.addEventListener('click', close);
+  closeBtn?.addEventListener('click', close);
+
+  // Close after following a link on mobile.
+  sidebar?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (window.matchMedia('(max-width: 1023px)').matches) close();
+    });
+  });
+</script>

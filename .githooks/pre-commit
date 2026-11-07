@@ -1,0 +1,45 @@
+#!/bin/bash
+# .githooks/pre-commit
+
+RAMAS_PROTEGIDAS=("main" "master" "develop" "staging" "release")
+RAMA_ACTUAL=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# 1. Protección de ramas
+for RAMA in "${RAMAS_PROTEGIDAS[@]}"; do
+  if [ "$RAMA_ACTUAL" = "$RAMA" ]; then
+    echo ""
+    echo "🚫 [RAMA PROTEGIDA] No puedes hacer commit en '$RAMA_ACTUAL'."
+    echo "   Crea una rama: git checkout -b feature/tu-descripcion"
+    echo ""
+    exit 1
+  fi
+done
+
+# 2. Detectar credenciales AWS accidentales
+echo "Verificando credenciales sensibles..."
+PATRON_AWS="AKIA[0-9A-Z]{16}"
+ARCHIVOS_STAGED=$(git diff --cached --name-only)
+
+for ARCHIVO in $ARCHIVOS_STAGED; do
+  if git show ":$ARCHIVO" 2>/dev/null | grep -qE "$PATRON_AWS"; then
+    echo ""
+    echo "🚨 [SEGURIDAD] Posible AWS Access Key encontrada en: $ARCHIVO"
+    echo "   Elimina la credencial y usa variables de entorno o AWS Secrets Manager."
+    echo ""
+    exit 1
+  fi
+done
+
+# 3. Detectar archivos .env que no deberían commitearse
+for ARCHIVO in $ARCHIVOS_STAGED; do
+  if echo "$ARCHIVO" | grep -qE "^\.env$|^\.env\.(local|production|staging|dev)$"; then
+    echo ""
+    echo "🚨 [SEGURIDAD] Intentas commitear un archivo sensible: $ARCHIVO"
+    echo "   Asegúrate de que esté en tu .gitignore."
+    echo ""
+    exit 1
+  fi
+done
+
+echo "Pre-commit OK"
+exit 0
